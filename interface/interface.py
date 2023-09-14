@@ -35,31 +35,31 @@ class SearchEngineGUI:
     def _add_search_entry(self):
         """Add the search entry box to the GUI."""
         self.search_entry = tk.Entry(
-            self.master, width=90, borderwidth=15, bg='white',
-            insertbackground='black', bd=0, relief='flat',
-            highlightthickness=1, highlightbackground="light gray", insertwidth=1
+            self.master, width=90, borderwidth=25, bg='#ffffff',
+            insertbackground='black', bd=1, relief='flat', fg="#000000",
+            highlightthickness=2, highlightbackground="light grey"
         )
         self.search_entry.pack(ipady=8, pady=20)
-        self.search_entry.bind("<Enter>", self.on_enter)
-        self.search_entry.bind("<Leave>", self.on_leave)
 
 
     def _add_search_button(self):
         """Add the search button to the GUI."""
-        button_frame = tk.Frame(self.master, bg='#ffffff')  # Set background to white
+        button_frame = tk.Frame(self.master, bg='#ffffff')  
         button_frame.pack(pady=10)
 
         # Querlo Search Button
         search_btn = tk.Button(
             button_frame, text="Querlo Search", command=self.perform_search,
-            bg="#faf5f5", fg="black", height=2, width=15, font=("Arial", 10), relief='flat'
+            bg="#faf5f5", fg="black", height=2, width=15, font=("Arial", 10), relief='flat',
+            highlightthickness=0, highlightbackground="#ffffff", bd=0
         )
         search_btn.grid(row=0, column=0, padx=10)
 
         # Load Corpus Button
         load_corpus_btn = tk.Button(
             button_frame, text="Load Corpus", command=self.load_corpus,
-            bg="#faf5f5", fg="black", height=2, width=15, font=("Arial", 10), relief='flat'
+            bg="#faf5f5", fg="black", height=2, width=15, font=("Arial", 10), relief='flat',
+            highlightthickness=0, highlightbackground="#ffffff", bd=0
         )
         load_corpus_btn.grid(row=0, column=1, padx=10)
 
@@ -97,21 +97,3 @@ class SearchEngineGUI:
         else:
             # Update warning label if no corpus is loaded
             self.warning_label.config(text="Please load a corpus to perform a search.")
-
-    def on_enter(self, event):
-        """
-        Highlight the search box when the mouse enters.
-        
-        Args:
-            event: The event object (not used, but required by Tkinter)
-        """
-        self.search_entry.config(highlightbackground='#A9A9A9')
-
-    def on_leave(self, event):
-        """
-        Remove the highlight when the mouse leaves the search box.
-        
-        Args:
-            event: The event object (not used, but required by Tkinter)
-        """
-        self.search_entry.config(highlightbackground='light gray')
