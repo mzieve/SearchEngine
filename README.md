@@ -9,7 +9,7 @@ Your search engine should ask for a directory to load documents from when it beg
 
 JSON documents are very different than the Moby Dick text documents: their title and content are both pulled from specific keys in the JSON data, rather than the content being the entire byte content of the file. This page will walk you through writing a JsonFileDocument class and using it to load .json documents into your existing search engine.
 
-###Tokenization
+### Tokenization
 Tokenize, process, and normalize the tokens of each document in the chosen corpus to form the terms of the search engine. Use the existing EnglishTokenStream for tokenization. Write a new derived-class of TokenProcessor that processes tokens into types and normalizes types into terms with two different methods. The "process token" method should convert a token into a type by:
 
 If there is at least one hyphen (-) in the token:
