@@ -3,23 +3,22 @@ from typing import Iterable
 from .document import Document
 
 class TextFileDocument(Document):
-    def __init__(self, id: int, title: str, content: str):
+    def __init__(self, id : int, path : Path):
         """Initialize a TextFileDocument instance."""
         super().__init__(id)
-        self._title = title
-        self._content = content
+        self.path = path
 
     @property
     def title(self) -> str:
         """Return the title of the document."""
-        return self._title
+        return self.path.stem
 
     def get_content(self) -> Iterable[str]:
         """Yield the content of the document as an iterable."""
-        yield self._content  # Changed from open(self.path)
+        return open(self.path)
 
     @staticmethod
-    def load_from(doc_id: int, title: str, content: str) -> 'TextFileDocument':
+    def load_from(abs_path : Path, doc_id : int) -> 'TextFileDocument':
         """Static method to load a TextFileDocument."""
-        return TextFileDocument(doc_id, title, content)
+        return TextFileDocument(doc_id, abs_path)
 	

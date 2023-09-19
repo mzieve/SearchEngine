@@ -55,9 +55,7 @@ class DirectoryCorpus:
                     self._documents[next_id] = self.factories[f.suffix](
                         next_id, data.get("title", ""), data.get("body", ""))
                 else:
-                    with open(f, 'r', encoding='utf-8') as text_file:
-                        content = text_file.read()
-                    self._documents[next_id] = self.factories[f.suffix](next_id, f.stem, content)
+                    self._documents[next_id] = self.factories[f.suffix](f, next_id)
                 next_id += 1
 
     @staticmethod

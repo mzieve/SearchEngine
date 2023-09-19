@@ -1,9 +1,13 @@
 from pathlib import Path
 from documents import DirectoryCorpus, TextFileDocument, JsonDocument
+from text import BasicTokenProcessor, EnglishTokenStream
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import ttk
+from tkinter import filedialog, Label
 import tkinter.font as font
 import os
+import time
+import threading
 
 class SearchEngineGUI:
     def __init__(self, master):
@@ -68,21 +72,78 @@ class SearchEngineGUI:
         self.warning_label.grid(row=1, columnspan=2, pady=15)
 
     def load_corpus(self):
-        """
-        Load the corpus from a user-selected directory.
-        
-        Uses filedialog to allow the user to select a directory, then loads text and JSON documents
-        from the selected directory into the corpus.
-        """
+        """Threading needed to prevent GUI freezing"""
+        threading.Thread(target=self._load_corpus_thread).start()
+
+    def _load_corpus_thread(self):
+        """Load tokenize a corpus folder that user selects"""
         folder_selected = filedialog.askdirectory()
+
         if folder_selected:
             corpus_path = Path(folder_selected)
             extension_factories = {
                 '.txt': TextFileDocument.load_from,
                 '.json': JsonDocument.load_from
             }
-            self.corpus = DirectoryCorpus.load_directory(corpus_path, extension_factories)
-            print(f"Corpus loaded from {corpus_path}. Total number of documents: {len(self.corpus)}")
+
+            vocabulary = set()
+            processor = BasicTokenProcessor()
+            num_documents = sum(1 for _ in DirectoryCorpus.load_directory(corpus_path, extension_factories))
+            total_operations = 3 * num_documents
+
+            # Progress bar
+            progress = ttk.Progressbar(self.master, orient='horizontal', length=300, mode='determinate')
+            progress['maximum'] = total_operations
+            progress.pack()
+
+            progress_label = Label(self.master, text="Progress: 0%", bg='#ffffff', font=("Arial", 10))
+            progress_label.pack()
+
+            self.master.update_idletasks()
+            self.corpus = []
+
+            start_time = time.time()
+
+            for i, doc_path in enumerate(DirectoryCorpus.load_directory(corpus_path, extension_factories)):
+                # Elapsed time to load
+                elapsed_time = time.time() - start_time
+                avg_time_per_doc = elapsed_time / (i + 1)
+                remaining_docs = num_documents - i - 1
+                estimated_time_remaining = avg_time_per_doc * remaining_docs
+                
+                # Calculate progress percentage
+                percentage_complete = (progress['value'] / total_operations) * 100
+
+                # Mintues to seconds
+                if estimated_time_remaining > 60:
+                    estimated_minutes = int(estimated_time_remaining // 60)
+                    estimated_seconds = int(estimated_time_remaining % 60)
+                    progress_label.config(text=f"Progress: {percentage_complete:.1f}%. Estimated time: {estimated_minutes}m {estimated_seconds}s")
+                else:
+                    progress_label.config(text=f"Progress: {percentage_complete:.1f}%. Estimated time: {int(estimated_time_remaining)}s")
+
+                self.corpus.append(doc_path)
+                progress['value'] += 1
+                self.master.update_idletasks()
+
+                # Process tokens
+                tokens = EnglishTokenStream(doc_path.get_content())
+                processed_tokens = [processor.process_token(token) for token in tokens]
+
+                # Flatten the processed tokens list
+                flat_processed_tokens = [token for sublist in processed_tokens for token in sublist]
+
+                # Normalize the tokens
+                normalized_tokens = [processor.normalize_type(token) for token in flat_processed_tokens]
+                vocabulary.update(normalized_tokens)
+
+                progress['value'] += 2
+                self.master.update_idletasks()
+
+            progress.destroy()
+            progress_label.destroy()
+            
+            return vocabulary
 
     def perform_search(self):
         """Perform a search query based on the user's input in the search box."""
