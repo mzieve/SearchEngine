@@ -17,7 +17,7 @@ class BasicTokenProcessor(TokenProcessor):
 		# Lowercase all tokens
 		token = token.lower()
 
-		# Hyphens
+		# Hpyhens
 		if '-' in token:
 			split_tokens = token.split('-')
 			combined_tokens = ''.join(split_tokens)
