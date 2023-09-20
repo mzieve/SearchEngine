@@ -113,7 +113,7 @@ class SearchEngineGUI:
                 
                 # Calculate progress percentage
                 percentage_complete = (progress['value'] / total_operations) * 100
-
+                
                 # Mintues to seconds
                 if estimated_time_remaining > 60:
                     estimated_minutes = int(estimated_time_remaining // 60)
