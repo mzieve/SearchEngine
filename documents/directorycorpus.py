@@ -1,6 +1,6 @@
 from typing import Callable, Iterable, Iterator, Optional
 from collections import defaultdict
-from documents.document import Document
+from .document import Document
 from pathlib import Path
 from . import textfiledocument, jsondocument
 import json

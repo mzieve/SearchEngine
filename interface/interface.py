@@ -145,16 +145,38 @@ class SearchEngineGUI:
             
             return vocabulary
 
+    def index_corpus(corpus: DocumentCorpus, token_processor: BasicTokenProcessor) -> Index:
+
+        # Create a PositionalInvertedIndex object.
+        p_i_index = PositionalInvertedIndex()
+        for d in corpus:
+            print(f"Found document '{d.title}'")
+            #   Tokenize the document's content by creating an EnglishTokenStream around the document's .content()
+            content = d.get_content()
+            token_stream = EnglishTokenStream(content)
+            #   Iterate through the token stream, processing each with token_processor's process_token method.
+            position = 0
+            for token in token_stream:
+                position += 1
+                types = token_processor.process_token(token)
+                # Normalize each type into a term, then add the term and its docID and position into the index.
+                for type in types:
+                    term = token_processor.normalize_type(type)
+                    p_i_index.addTerm(term, d.id, position)
+        return p_i_index
+
     def perform_search(self):
         """Perform a search query based on the user's input in the search box."""
         query = self.search_entry.get()
         if self.corpus:
             self.warning_label.config(text="")  # Clear any previous warnings
-            # TODO: Implement actual search logic here.
+            # TODO: Implement actual search logic here from testindexing.py. Modify _load_corpus_thread() function to add terms to positional inverted index, not just make a vocabulary.
             # The following is just a placeholder.
+            '''
             for doc in self.corpus:
                 if query.lower() in doc.title.lower():
                     print(f"Document ID: {doc.id}, Title: {doc.title}")
+            '''
         else:
             # Update warning label if no corpus is loaded
             self.warning_label.config(text="Please load a corpus to perform a search.")

@@ -10,23 +10,24 @@ class BasicTokenProcessor(TokenProcessor):
 		self.stemmer = PorterStemmer()
 
 	def process_token(self, token: str):
+		# Process Tokens Into Types
 		# Remove non-alphanumeric characters
 		token = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', token)
-		# Remove all apostophes or quotation marks
+		# Remove all apostrophes or quotation marks
 		token = re.sub(r"[\"']", '', token)
 		# Lowercase all tokens
 		token = token.lower()
 
-		# Hpyhens
+		# Hyphens
 		if '-' in token:
 			split_tokens = token.split('-')
 			combined_tokens = ''.join(split_tokens)
-			result_tokens = split_tokens + [combined_tokens]
+			result_types = split_tokens + [combined_tokens]
 		else:
-			result_tokens = [token]
+			result_types = [token]
 
-		return result_tokens
+		return result_types
 
-	def normalize_type(self, token: str):
-		# Normlizes Tokens
-		return self.stemmer.stem(token)
+	def normalize_type(self, type: str):
+		# Normalize Types into Terms
+		return self.stemmer.stem(type)
