@@ -1,7 +1,7 @@
 import pytest
 import io
-from text.basictokenprocessor import BasicTokenProcessor
-from text.englishtokenstream import EnglishTokenStream
+from .basictokenprocessor import BasicTokenProcessor
+from .englishtokenstream import EnglishTokenStream
 
 processor = BasicTokenProcessor()
 
@@ -12,9 +12,10 @@ def process_stream(source_text):
     processed_tokens = [processor.process_token(token) for token in stream]
     return [item for sublist in processed_tokens for item in sublist]
 
-# Unit test for processing and normalizing according to assignment requirements 
+# Unit tests for processing and normalizing according to assignment requirements
 def test_punctuation_removal():
     assert process_stream("Hello, world!") == ["hello", "world"]
+    assert process_stream("\"'Please remove all single and double quotes.'\"") == ["please", "remove", "all", "single", "and", "double", "quotes"]
 
 def test_tokenization():
     assert process_stream("This is a sentence") == ["this", "is", "a", "sentence"]

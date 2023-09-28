@@ -1,8 +1,8 @@
 from pathlib import Path
-from documents.corpus import DocumentCorpus
-from documents.directorycorpus import DirectoryCorpus
-from documents.jsondocument import JsonDocument
-from documents.textfiledocument import TextFileDocument
+from .corpus import DocumentCorpus
+from .directorycorpus import DirectoryCorpus
+from .jsondocument import JsonDocument
+from .textfiledocument import TextFileDocument
 import pytest
 import tempfile
 import os
