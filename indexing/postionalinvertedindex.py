@@ -10,15 +10,9 @@ class PositionalInvertedIndex(Index):
         """Constructs an empty index"""
         self.index = dict()
 
-    def getPostings(self, term: str) -> Iterable[Posting]:
+    def get_postings(self, term: str) -> Iterable[Posting]:
         """Returns a list of Postings for all documents that contain the given term."""
-        postings = []
-        if term in self.index:
-            print("This query term appears in: ")
-            postings = self.index[term]
-        elif term != "quit":
-            print("Sorry, cannot find the term '{}' for you. Please search for another term.".format(term))
-        return postings
+        return self.index.get(term, [])
 
     def getVocabulary(self) -> Iterable[str]:
         vocab = sorted(self.index.keys())

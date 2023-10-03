@@ -12,9 +12,7 @@ class BasicTokenProcessor(TokenProcessor):
 	def process_token(self, token: str):
 		# Process Tokens Into Types
 		# Remove non-alphanumeric characters
-		token = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', token)
-		# Remove all apostrophes or quotation marks
-		token = re.sub(r"[\"']", '', token)
+		token = re.sub(r'[^a-zA-Z0-9]', '', token)
 		# Lowercase all tokens
 		token = token.lower()
 

@@ -27,6 +27,9 @@ def test_beg_end():
     assert process_stream("Hello.") == ["hello"]
     assert process_stream("192.168.1.1") == ["192.168.1.1"]
 
+def test_question():
+    assert process_stream("Hello?") == ["hello"]
+
 def test_hyphens():
     assert process_stream("Hewlett-Packard-Computing") == ["hewlett", "packard", "computing", "hewlettpackardcomputing"]
 
