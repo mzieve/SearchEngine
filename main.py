@@ -1,5 +1,5 @@
 import tkinter as tk
-from interface import SearchEngineGUI
+from engine.interface import SearchEngineGUI
 import sys
 
 if __name__ == "__main__":

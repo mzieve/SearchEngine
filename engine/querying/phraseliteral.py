@@ -1,4 +1,4 @@
-from indexing.postings import Posting
+from engine.indexing import Posting
 from .querycomponent import QueryComponent
 
 class PhraseLiteral(QueryComponent):

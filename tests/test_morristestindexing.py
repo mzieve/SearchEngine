@@ -1,4 +1,4 @@
-from .postionalinvertedindex import PositionalInvertedIndex
+from engine.indexing.postionalinvertedindex import PositionalInvertedIndex
 import pytest
 
 @pytest.fixture

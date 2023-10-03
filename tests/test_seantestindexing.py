@@ -3,14 +3,15 @@ from pathlib import Path
 from tkinter import filedialog
 import sys
 
-from .documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
-from .indexing import Index, PositionalInvertedIndex
-from .text import BasicTokenProcessor, EnglishTokenStream
+from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
+from engine.indexing import Index, PositionalInvertedIndex
+from engine.text import BasicTokenProcessor, EnglishTokenStream
 
 """This basic program builds a positional inverted index over the .txt files 
 in the Path that is given."""
 
 
+"""
 def index_corpus(corpus: DocumentCorpus, token_processor: BasicTokenProcessor) -> Index:
 
     # Create a PositionalInvertedIndex object.
@@ -56,3 +57,4 @@ if folder_selected:
             for p in index.getPostings(query_term):
                 doc = d.get_document(p.doc_id)
                 print("Doc ID {}. \"{}\" at positions {}".format(p.doc_id, doc.title, p.positions))
+"""

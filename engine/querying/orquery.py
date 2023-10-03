@@ -1,6 +1,5 @@
 from .querycomponent import QueryComponent
-from indexing import Index, Posting
-
+from engine.indexing import Index, Posting
 from . import querycomponent
 
 class OrQuery(QueryComponent):
