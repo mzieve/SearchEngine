@@ -1,5 +1,6 @@
+from engine.querying import AndQuery, BooleanQueryParser, OrQuery, TermLiteral, PhraseLiteral
+from engine.indexing import Posting
 import pytest
-from . import AndQuery, BooleanQueryParser, OrQuery, TermLiteral, PhraseLiteral
 
 def test_parse_simple_query():
     query_str = 'cat dog'

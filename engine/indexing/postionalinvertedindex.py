@@ -2,7 +2,6 @@ from typing import Iterable
 from .postings import Posting
 from .index import Index
 
-
 class PositionalInvertedIndex(Index):
     """Implements a positional inverted index."""
 
@@ -14,10 +13,8 @@ class PositionalInvertedIndex(Index):
         """Returns a list of Postings for all documents that contain the given term."""
         postings = []
         if term in self.index:
-            print("This query term appears in: ")
             postings = self.index[term]
-        elif term != "quit":
-            print("Sorry, cannot find this term for you. Please search for another term.")
+
         return postings
 
     def getVocabulary(self) -> Iterable[str]:

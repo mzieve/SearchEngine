@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Iterable
-
 from .postings import Posting
 
 class Index(ABC):

@@ -6,18 +6,19 @@ from . import textfiledocument, jsondocument
 import json
 
 class DirectoryCorpus:
+    """
+    Initialize a DirectoryCorpus instance.
+    
+    Args:
+        abs_path: Absolute path to the directory containing documents.
+        fileFilter: Callable to filter files. By default, accepts all.
+        factories: Dictionary mapping file extensions to factory methods for Document instances.
+    """
     def __init__(self,
                  abs_path: Path,
                  file_filter: Callable[[Path], bool] = lambda p: True,
                  factories: Optional[dict[str, Callable[[str], Document]]] = None):
-        """
-        Initialize a DirectoryCorpus instance.
-        
-        Args:
-            abs_path: Absolute path to the directory containing documents.
-            fileFilter: Callable to filter files. By default, accepts all.
-            factories: Dictionary mapping file extensions to factory methods for Document instances.
-        """
+
         self.corpus_path = abs_path
         self.file_filter = file_filter
         default_factories = {

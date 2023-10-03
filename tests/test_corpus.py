@@ -1,8 +1,5 @@
+from engine.documents import DocumentCorpus, DirectoryCorpus, JsonDocument, TextFileDocument
 from pathlib import Path
-from .corpus import DocumentCorpus
-from .directorycorpus import DirectoryCorpus
-from .jsondocument import JsonDocument
-from .textfiledocument import TextFileDocument
 import pytest
 import tempfile
 import os

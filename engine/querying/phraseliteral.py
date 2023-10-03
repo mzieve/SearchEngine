@@ -1,4 +1,4 @@
-from ..indexing.postings import Posting
+from engine.indexing import Posting
 from .querycomponent import QueryComponent
 
 class PhraseLiteral(QueryComponent):
@@ -9,11 +9,11 @@ class PhraseLiteral(QueryComponent):
     def __init__(self, terms : list[QueryComponent]):
         self.literals = terms
 
-    def get_postings(self, index) -> list[Posting]:
+    def getPostings(self, index) -> list[Posting]:
         if not self.literals or isinstance(self.literals[0], TermLiteral):
             return []
             
-        postings_lists = [literal.get_postings(index) for literal in self.literals if isinstance(literal, QueryComponent)]
+        postings_lists = [literal.getPostings(index) for literal in self.literals if isinstance(literal, QueryComponent)]
         
         if not postings_lists or not all(postings_lists):
             return []

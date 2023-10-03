@@ -1,16 +1,15 @@
 from .querycomponent import QueryComponent
-from ..indexing import Index, Posting
-
+from engine.indexing import Index, Posting
 from . import querycomponent
 
 class OrQuery(QueryComponent):
     def __init__(self, components : list[QueryComponent]):
         self.components = components
 
-    def get_postings(self, index : Index) -> list[Posting]:
+    def getPostings(self, index : Index) -> list[Posting]:
         result = set()
         for component in self.components:
-            result.update(component.get_postings(index))
+            result.update(component.getPostings(index))
         return list(result)
 
     def __str__(self):

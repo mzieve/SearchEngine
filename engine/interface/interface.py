@@ -1,23 +1,17 @@
-import sys
-sys.path.append("")
-# Adds higher directory to python modules path.
-
+from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
+from engine.text import BasicTokenProcessor, EnglishTokenStream
+from engine.indexing import Index, PositionalInvertedIndex
+from engine.querying import BooleanQueryParser
+from tkinter import filedialog, Label, ttk
 from pathlib import Path
-from documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
-from documents import DirectoryCorpus, TextFileDocument, JsonDocument, DocumentCorpus
-from text import BasicTokenProcessor, EnglishTokenStream
-from indexing import Index, PositionalInvertedIndex
-from indexing import Index, PositionalInvertedIndex
-from querying import BooleanQueryParser
 from io import StringIO
 import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog, Label
 import tkinter.font as font
 import os
 import time
 import threading
 import re
+import traceback
 
 class SearchEngineGUI:
     def __init__(self, master):
@@ -103,7 +97,7 @@ class SearchEngineGUI:
             load_dir_time = load_end_time-load_start_time
             load_dir_mins = (load_dir_time // 60)
             load_dir_secs = (load_dir_time % 60)
-            print("Time to load directory into corpus: {} mins, {} seconds".format(load_dir_mins, load_dir_secs))
+            # print("Time to load directory into corpus: {} mins, {} seconds".format(load_dir_mins, load_dir_secs))
 
             num_documents = sum(1 for _ in self.corpus)
             total_operations = 3 * num_documents
@@ -127,7 +121,6 @@ class SearchEngineGUI:
                 remaining_docs = num_documents - i - 1
                 estimated_time_remaining = avg_time_per_doc * remaining_docs
 
-                self.corpus.append(doc_path)
                 progress['value'] += 1  # Update progress for loading the document
 
                 # Calculate progress percentage after progress['value'] update
@@ -164,22 +157,28 @@ class SearchEngineGUI:
             index_corpus_time = index_end_time - index_start_time
             index_corpus_mins = (index_corpus_time // 60)
             index_corpus_secs = (index_corpus_time % 60)
-            print("Time to index corpus: {} mins, {} seconds".format(index_corpus_mins, index_corpus_secs))
+
+            # print("Time to index corpus: {} mins, {} seconds".format(index_corpus_mins, index_corpus_secs))
+
             total_secs = load_dir_secs + index_corpus_secs
             total_mins = load_dir_mins + index_corpus_mins
             if (total_secs > 60):
                 extra_mins = total_secs // 60
                 total_secs = total_secs % 60
                 total_mins += extra_mins
-            print("Total time to load corpus: {} mins, {} seconds".format(total_mins, total_secs))
-            print("Corpus loaded! Ready to search.")
+
+            # print("Total time to load corpus: {} mins, {} seconds".format(total_mins, total_secs))
+            # print("Corpus loaded! Ready to search.")
+
             vocabulary = self.p_i_index.getVocabulary()
             vocab_set = set(vocabulary)
 
             return vocab_set
 
     def perform_search(self):
-        """Perform a search query based on the user's input in the search box."""
+        """
+        ''' Sean's Search Code, which is better in returning document ID's, titles and positions for single-query search terms'''
+        '''Perform a search query based on the user's input in the search box.'''
         query = self.search_entry.get()
         print("Searching for the term '{}'".format(query))
         if self.corpus:
@@ -193,13 +192,16 @@ class SearchEngineGUI:
         else:
             # Update warning label if no corpus is loaded
             self.warning_label.config(text="Please load a corpus to perform a search.")
+        """
+
+        '''Morris' Search Code, which is better at Boolean querying and exception handling. Combine the best of both worlds.'''
         '''Perform search by boolean query'''
-        if self.corpus is None or self.positional_index is None:
+        if self.corpus is None or self.p_i_index is None:
             self.warning_label.config(text="Please load a corpus first.")
             return
 
         raw_query = self.search_entry.get()
-        print("Raw Query:", raw_query)
+        # print("Raw Query:", raw_query)
         if not raw_query:
             self.warning_label.config(text="Please enter a search query.")
             return
@@ -231,15 +233,13 @@ class SearchEngineGUI:
                 self.warning_label.config(text="Invalid Query. Please enter a valid search query.")
                 return
 
-            print("Processed and Parsed Query:", parsed_query)
-            print("Corpus:", self.corpus)
-            print("Positional Index:", self.positional_index)
+            # print("Processed and Parsed Query:", parsed_query)
+            # print("Corpus:", self.corpus)
+            # print("Positional Index:", self.p_i_index)
 
-            # Assuming that parsed_query can now interact with the positional_index
-            # to get postings lists without manually processing terms
-            postings = parsed_query.get_postings(self.positional_index)
+            postings = parsed_query.getPostings(self.p_i_index)
+            # print("Postings:", postings)
 
-            print("Postings:", postings)
             if not postings:
                 print("No documents found.")
                 return
@@ -249,11 +249,12 @@ class SearchEngineGUI:
             for doc_id in found_docs:
                 doc = next((d for d in self.corpus if d.id == doc_id), None)
                 if doc:
-                    print(f"Document id #{doc.id}, Title: {doc.title}")
+                    print(f"Document ID# {doc.id}, Title: {doc.title}")
 
         except Exception as e:
             self.warning_label.config(text=str(e))
             print("Error during search:", str(e))
+            traceback.print_exc()
 
 
 
