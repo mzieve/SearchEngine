@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from ..indexing import Posting
+from ..indexing.postings import Posting
 
 class QueryComponent(ABC):
     """
@@ -8,7 +8,7 @@ class QueryComponent(ABC):
     """
 
     @abstractmethod
-    def get_postings(self, index) -> list[Posting]:
+    def getPostings(self, index) -> list[Posting]:
         """
         Retrieves a list of postings for the query component, using an Index as the source.
         """
