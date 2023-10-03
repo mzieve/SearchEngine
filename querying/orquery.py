@@ -1,7 +1,7 @@
 from .querycomponent import QueryComponent
-from indexing import Index, Posting
+from ..indexing import Index, Posting
 
-from querying import querycomponent 
+from . import querycomponent
 
 class OrQuery(QueryComponent):
     def __init__(self, components : list[QueryComponent]):

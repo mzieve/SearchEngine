@@ -15,7 +15,6 @@ def index_corpus(corpus: DocumentCorpus, token_processor: BasicTokenProcessor) -
     # Create a PositionalInvertedIndex object.
     p_i_index = PositionalInvertedIndex()
     for d in corpus:
-        print(f"Found document '{d.title}'")
         #   Tokenize the document's content by creating an EnglishTokenStream around the document's .content()
         content = d.get_content()
         token_stream = EnglishTokenStream(content)
@@ -45,8 +44,7 @@ if __name__ == "__main__":
         # Build the index over this directory.
         token_processor = BasicTokenProcessor()
         index = index_corpus(d, token_processor)
-        print("Vocab of our corpus: ", index.getVocabulary())
-
+        print("Corpus loaded! Ready to search.")
         # We aren't ready to use a full query parser;
         # for now, we'll only support single-term queries.
 
@@ -58,4 +56,4 @@ if __name__ == "__main__":
                 query_term = token_processor.normalize_type(query_type)
                 for p in index.getPostings(query_term):
                     doc = d.get_document(p.doc_id)
-                    print("'{}' at positions {}".format(doc.title, p.positions))
+                    print("Doc ID {}. \"{}\" at positions {}".format(p.doc_id, doc.title, p.positions))

@@ -1,6 +1,11 @@
+import sys
+sys.path.append("")
+# Adds higher directory to python modules path.
+
 from pathlib import Path
-from documents import DirectoryCorpus, TextFileDocument, JsonDocument
+from documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
 from text import BasicTokenProcessor, EnglishTokenStream
+from indexing import Index, PositionalInvertedIndex
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, Label
@@ -19,7 +24,9 @@ class SearchEngineGUI:
         self._add_logo()
         self._add_search_entry()
         self._add_search_button()
-        self.corpus = None 
+        self.corpus = None
+        self.p_i_index = PositionalInvertedIndex()
+        self.processor = BasicTokenProcessor()
 
     def _center_window(self, width, height):
         """Center the application window on the screen."""
@@ -85,10 +92,15 @@ class SearchEngineGUI:
                 '.txt': TextFileDocument.load_from,
                 '.json': JsonDocument.load_from
             }
+            load_start_time = time.time()
+            self.corpus = DirectoryCorpus.load_directory(corpus_path, extension_factories)
+            load_end_time = time.time()
+            load_dir_time = load_end_time-load_start_time
+            load_dir_mins = (load_dir_time // 60)
+            load_dir_secs = (load_dir_time % 60)
+            print("Time to load directory into corpus: {} mins, {} seconds".format(load_dir_mins, load_dir_secs))
 
-            vocabulary = set()
-            processor = BasicTokenProcessor()
-            num_documents = sum(1 for _ in DirectoryCorpus.load_directory(corpus_path, extension_factories))
+            num_documents = sum(1 for _ in self.corpus)
             total_operations = 3 * num_documents
 
             # Progress bar
@@ -100,13 +112,12 @@ class SearchEngineGUI:
             progress_label.pack()
 
             self.master.update_idletasks()
-            self.corpus = []
 
-            start_time = time.time()
+            index_start_time = time.time()
 
-            for i, doc_path in enumerate(DirectoryCorpus.load_directory(corpus_path, extension_factories)):
-                # Elapsed time to load
-                elapsed_time = time.time() - start_time
+            for i, doc_path in enumerate(self.corpus):
+                # Elapsed time to build index
+                elapsed_time = time.time() - index_start_time
                 avg_time_per_doc = elapsed_time / (i + 1)
                 remaining_docs = num_documents - i - 1
                 estimated_time_remaining = avg_time_per_doc * remaining_docs
@@ -122,61 +133,56 @@ class SearchEngineGUI:
                 else:
                     progress_label.config(text=f"Progress: {percentage_complete:.1f}%. Estimated time: {int(estimated_time_remaining)}s")
 
-                self.corpus.append(doc_path)
+                #self.corpus.append(doc_path)
                 progress['value'] += 1
                 self.master.update_idletasks()
 
                 # Process tokens
                 tokens = EnglishTokenStream(doc_path.get_content())
-                processed_tokens = [processor.process_token(token) for token in tokens]
-
-                # Flatten the processed tokens list
-                flat_processed_tokens = [token for sublist in processed_tokens for token in sublist]
-
-                # Normalize the tokens
-                normalized_tokens = [processor.normalize_type(token) for token in flat_processed_tokens]
-                vocabulary.update(normalized_tokens)
+                position = 0
+                for token in tokens:
+                    position += 1
+                    types = self.processor.process_token(token)
+                    # Normalize each type into a term, then add the term and its docID and position into the index.
+                    for type in types:
+                        term = self.processor.normalize_type(type)
+                        self.p_i_index.addTerm(term, doc_path.id, position)
 
                 progress['value'] += 2
                 self.master.update_idletasks()
 
             progress.destroy()
             progress_label.destroy()
-            
-            return vocabulary
+            index_end_time = time.time()
+            index_corpus_time = index_end_time - index_start_time
+            index_corpus_mins = (index_corpus_time // 60)
+            index_corpus_secs = (index_corpus_time % 60)
+            print("Time to index corpus: {} mins, {} seconds".format(index_corpus_mins, index_corpus_secs))
+            total_secs = load_dir_secs + index_corpus_secs
+            total_mins = load_dir_mins + index_corpus_mins
+            if (total_secs > 60):
+                extra_mins = total_secs // 60
+                total_secs = total_secs % 60
+                total_mins += extra_mins
+            print("Total time to load corpus: {} mins, {} seconds".format(total_mins, total_secs))
+            print("Corpus loaded! Ready to search.")
+            vocabulary = self.p_i_index.getVocabulary()
+            vocab_set = set(vocabulary)
 
-    def index_corpus(corpus: DocumentCorpus, token_processor: BasicTokenProcessor) -> Index:
-
-        # Create a PositionalInvertedIndex object.
-        p_i_index = PositionalInvertedIndex()
-        for d in corpus:
-            print(f"Found document '{d.title}'")
-            #   Tokenize the document's content by creating an EnglishTokenStream around the document's .content()
-            content = d.get_content()
-            token_stream = EnglishTokenStream(content)
-            #   Iterate through the token stream, processing each with token_processor's process_token method.
-            position = 0
-            for token in token_stream:
-                position += 1
-                types = token_processor.process_token(token)
-                # Normalize each type into a term, then add the term and its docID and position into the index.
-                for type in types:
-                    term = token_processor.normalize_type(type)
-                    p_i_index.addTerm(term, d.id, position)
-        return p_i_index
+            return vocab_set
 
     def perform_search(self):
         """Perform a search query based on the user's input in the search box."""
         query = self.search_entry.get()
+        print("Searching for the term '{}'".format(query))
         if self.corpus:
             self.warning_label.config(text="")  # Clear any previous warnings
-            # TODO: Implement actual search logic here from testindexing.py. Modify _load_corpus_thread() function to add terms to positional inverted index, not just make a vocabulary.
-            # The following is just a placeholder.
-            '''
-            for doc in self.corpus:
-                if query.lower() in doc.title.lower():
-                    print(f"Document ID: {doc.id}, Title: {doc.title}")
-            '''
+            query_types = self.processor.process_token(query)
+            for query_type in query_types:
+                query_term = self.processor.normalize_type(query_type)
+                for p in self.p_i_index.getPostings(query_term):
+                    doc = self.corpus.get_document(p.doc_id)
+                    print("Doc ID {}. \"{}\" at positions {}". format(p.doc_id, doc.title, p.positions))
         else:
             # Update warning label if no corpus is loaded
             self.warning_label.config(text="Please load a corpus to perform a search.")

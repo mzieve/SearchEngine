@@ -17,7 +17,7 @@ class PositionalInvertedIndex(Index):
             print("This query term appears in: ")
             postings = self.index[term]
         elif term != "quit":
-            print("Sorry, cannot find the term '{}' for you. Please search for another term.".format(term))
+            print("Sorry, cannot find this term for you. Please search for another term.")
         return postings
 
     def getVocabulary(self) -> Iterable[str]:

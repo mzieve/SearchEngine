@@ -1,5 +1,5 @@
 import tkinter as tk
-from interface.interface import SearchEngineGUI
+from interface import SearchEngineGUI
 
 if __name__ == "__main__":
     root = tk.Tk()
