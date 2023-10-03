@@ -1,4 +1,4 @@
-from indexing.postings import Posting
+from ..indexing.postings import Posting
 from .querycomponent import QueryComponent
 
 class TermLiteral(QueryComponent):
