@@ -4,8 +4,12 @@ sys.path.append("")
 
 from pathlib import Path
 from documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
+from documents import DirectoryCorpus, TextFileDocument, JsonDocument, DocumentCorpus
 from text import BasicTokenProcessor, EnglishTokenStream
 from indexing import Index, PositionalInvertedIndex
+from indexing import Index, PositionalInvertedIndex
+from querying import BooleanQueryParser
+from io import StringIO
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog, Label
@@ -13,6 +17,7 @@ import tkinter.font as font
 import os
 import time
 import threading
+import re
 
 class SearchEngineGUI:
     def __init__(self, master):
@@ -121,11 +126,14 @@ class SearchEngineGUI:
                 avg_time_per_doc = elapsed_time / (i + 1)
                 remaining_docs = num_documents - i - 1
                 estimated_time_remaining = avg_time_per_doc * remaining_docs
-                
-                # Calculate progress percentage
+
+                self.corpus.append(doc_path)
+                progress['value'] += 1  # Update progress for loading the document
+
+                # Calculate progress percentage after progress['value'] update
                 percentage_complete = (progress['value'] / total_operations) * 100
                 
-                # Mintues to seconds
+                # Updating progress_label
                 if estimated_time_remaining > 60:
                     estimated_minutes = int(estimated_time_remaining // 60)
                     estimated_seconds = int(estimated_time_remaining % 60)
@@ -133,7 +141,6 @@ class SearchEngineGUI:
                 else:
                     progress_label.config(text=f"Progress: {percentage_complete:.1f}%. Estimated time: {int(estimated_time_remaining)}s")
 
-                #self.corpus.append(doc_path)
                 progress['value'] += 1
                 self.master.update_idletasks()
 
@@ -186,3 +193,67 @@ class SearchEngineGUI:
         else:
             # Update warning label if no corpus is loaded
             self.warning_label.config(text="Please load a corpus to perform a search.")
+        '''Perform search by boolean query'''
+        if self.corpus is None or self.positional_index is None:
+            self.warning_label.config(text="Please load a corpus first.")
+            return
+
+        raw_query = self.search_entry.get()
+        print("Raw Query:", raw_query)
+        if not raw_query:
+            self.warning_label.config(text="Please enter a search query.")
+            return
+
+        self.warning_label.config(text="")
+
+        # Identify terms and operators separately
+        terms = re.split(r'([+])', raw_query)
+
+        # Process only terms, leave operators as is
+        token_processor = BasicTokenProcessor()
+        processed_query_parts = []
+        for term in terms:
+            if term in ['+']:
+                processed_query_parts.append(term)
+            else:
+                tokens = EnglishTokenStream(StringIO(term.strip()))  # Tokenizing the term
+                processed_tokens = [token_processor.process_token(token) for token in tokens]
+                flat_processed_tokens = [token for sublist in processed_tokens for token in sublist]
+                normalized_term = ' '.join([token_processor.normalize_type(token) for token in flat_processed_tokens])
+                processed_query_parts.append(normalized_term)
+
+        # Reconstruct the query string
+        normalized_query = ''.join(processed_query_parts)
+
+        try:
+            parsed_query = BooleanQueryParser.parse_query(normalized_query)
+            if parsed_query is None:
+                self.warning_label.config(text="Invalid Query. Please enter a valid search query.")
+                return
+
+            print("Processed and Parsed Query:", parsed_query)
+            print("Corpus:", self.corpus)
+            print("Positional Index:", self.positional_index)
+
+            # Assuming that parsed_query can now interact with the positional_index
+            # to get postings lists without manually processing terms
+            postings = parsed_query.get_postings(self.positional_index)
+
+            print("Postings:", postings)
+            if not postings:
+                print("No documents found.")
+                return
+
+            found_docs = {posting.doc_id for posting in postings}
+
+            for doc_id in found_docs:
+                doc = next((d for d in self.corpus if d.id == doc_id), None)
+                if doc:
+                    print(f"Document id #{doc.id}, Title: {doc.title}")
+
+        except Exception as e:
+            self.warning_label.config(text=str(e))
+            print("Error during search:", str(e))
+
+
+
