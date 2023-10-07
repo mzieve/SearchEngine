@@ -38,3 +38,6 @@ class AndQuery(QueryComponent):
 
     def __str__(self):
         return " AND ".join(map(str, self.components))
+
+    def matches(self, tokens: set) -> bool:
+        return all(component.matches(tokens) for component in self.components)
