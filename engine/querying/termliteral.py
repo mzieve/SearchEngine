@@ -14,3 +14,6 @@ class TermLiteral(QueryComponent):
 
     def __str__(self) -> str:
         return self.term
+
+    def matches(self, tokens: set) -> bool:
+        return self.term in tokens

@@ -14,3 +14,6 @@ class OrQuery(QueryComponent):
 
     def __str__(self):
         return "(" + " OR ".join(map(str, self.components)) + ")"
+
+    def matches(self, tokens: set) -> bool:
+        return any(component.matches(tokens) for component in self.components)
