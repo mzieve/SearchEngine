@@ -1,8 +1,8 @@
 import tkinter as tk
-from engine.interface import SearchEngineGUI
+from engine.interface.controller import SearchController
 import sys
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = SearchEngineGUI(root)
+    app = SearchController(root)
     root.mainloop()

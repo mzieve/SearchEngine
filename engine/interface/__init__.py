@@ -1,1 +1,4 @@
-from .interface import SearchEngineGUI
+from .controller import SearchController
+from .view import SearchView
+from .model import SearchManager
+from .decorators import threaded
