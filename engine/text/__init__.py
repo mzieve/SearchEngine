@@ -1,2 +1,4 @@
 from .englishtokenstream import EnglishTokenStream
 from .basictokenprocessor import BasicTokenProcessor
+from .spanishtokenstream import SpanishTokenStream
+from .spanishtokenprocessor import SpanishTokenProcessor

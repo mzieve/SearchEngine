@@ -242,11 +242,9 @@ class ResultsPage(tk.Frame):
         ).grid(row=1, column=0, sticky='w', pady=(0, 0))
 
         if content_sentence:
-            words = content_sentence.split()
-            truncated_content = ' '.join(words[:25]) + '...' if len(words) > 25 else content_sentence
             tk.Label(
                 result_frame,
-                text=truncated_content,
+                text=content_sentence,
                 font=("Arial", 10),
                 fg="grey",
                 bg='#ffffff',

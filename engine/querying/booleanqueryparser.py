@@ -56,7 +56,7 @@ class BooleanQueryParser:
             next_quote = subquery.find('"', start_index + 1)
             if next_quote >= 0:
                 phrase_contents = subquery[start_index + 1:next_quote]
-                length_out = next_quote - start_index + 1  # including both quotation marks
+                length_out = next_quote - start_index + 1 
 
                 # Modification: Check if phrase_contents contain more than one word
                 if ' ' in phrase_contents:

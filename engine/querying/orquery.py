@@ -7,10 +7,16 @@ class OrQuery(QueryComponent):
         self.components = components
 
     def getPostings(self, index : Index) -> list[Posting]:
-        result = set()
+        document_ids = set()
+        postings = []
+        
         for component in self.components:
-            result.update(component.getPostings(index))
-        return list(result)
+            for posting in component.getPostings(index):
+                if posting.doc_id not in document_ids:  
+                    postings.append(posting)
+                    document_ids.add(posting.doc_id) 
+                    
+        return postings
 
     def __str__(self):
         return "(" + " OR ".join(map(str, self.components)) + ")"

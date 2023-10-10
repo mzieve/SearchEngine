@@ -2,7 +2,7 @@ from typing import Callable, Iterable, Iterator, Optional
 from collections import defaultdict
 from .document import Document
 from pathlib import Path
-from . import textfiledocument, jsondocument
+from . import textfiledocument, jsondocument, xmldocument
 import json
 
 class DirectoryCorpus:
@@ -23,7 +23,8 @@ class DirectoryCorpus:
         self.file_filter = file_filter
         default_factories = {
             '.txt': textfiledocument.TextFileDocument.load_from,
-            '.json': jsondocument.JsonDocument.load_from
+            '.json': jsondocument.JsonDocument.load_from,
+            '.xml': xmldocument.XMLDocument.load_from
         }
         self.factories = factories or defaultdict(lambda: None, default_factories)
         self._documents = {}
@@ -41,6 +42,9 @@ class DirectoryCorpus:
         """Return the total number of documents in the corpus."""
         return len(self._documents)
 
+    def __getitem__(self, index):
+        return list(self.documents())[index]
+
     def get_document(self, docID: int) -> Document:
         """Return a Document instance by its ID."""
         return self._documents.get(docID, None)
@@ -55,6 +59,8 @@ class DirectoryCorpus:
                         data = json.load(json_file)
                     self._documents[next_id] = self.factories[f.suffix](
                         next_id, data.get("title", ""), data.get("body", ""))
+                elif f.suffix == '.xml':
+                    self._documents[next_id] = self.factories[f.suffix](f, next_id)
                 else:
                     self._documents[next_id] = self.factories[f.suffix](f, next_id)
                 next_id += 1
