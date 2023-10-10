@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from engine.indexing import Posting
+from ..indexing import Posting
 
 class QueryComponent(ABC):
     """

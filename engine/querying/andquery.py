@@ -1,6 +1,6 @@
 from .querycomponent import QueryComponent
 from engine.indexing import Index, Posting
-from . import querycomponent
+from .notquery import NotQuery
 
 class AndQuery(QueryComponent):
     def __init__(self, components : list[QueryComponent]):
@@ -13,13 +13,12 @@ class AndQuery(QueryComponent):
 		# intersecting the resulting postings.
         result = self.components[0].getPostings(index)
         for component in self.components[1:]:
-            '''AND the component postings with the result. For two different words, we would AND their postings'
-             doc ID's, but I am not sure what to do with their different positions. Discuss this w Morris. '''
+            not_component = True if component.is_positive() == False else False
             new_postings = component.getPostings(index)
-            result = self._and_op(result, new_postings)
+            result = self._and_op(result, new_postings, not_component)
         return result
 
-    def _and_op(self, first_postings, second_postings):
+    def _and_op(self, first_postings, second_postings, not_component):
         result = []
         i, j = 0, 0
         first_p_len, second_p_len = len(first_postings), len(second_postings)
@@ -27,10 +26,13 @@ class AndQuery(QueryComponent):
             first_p_doc_id = first_postings[i].doc_id
             second_p_doc_id = second_postings[j].doc_id
             if first_p_doc_id == second_p_doc_id:
-                result.append(first_postings[i])
+                if not not_component:
+                    result.append(first_postings[i])
                 i += 1
                 j += 1
             elif first_p_doc_id < second_p_doc_id:
+                if not_component:
+                    result.append(first_postings[i])
                 i += 1
             else:
                 j += 1

@@ -28,6 +28,11 @@ class CorpusManager:
         return self.corpus
 
     def index_corpus(self, progress_callback=None):
+        """
+        Indexes the corpus.
+        :param progress_callback:
+        :return:
+        """
         for i, doc_path in enumerate(self.corpus):
             tokens = EnglishTokenStream(doc_path.get_content())
             position = 0
@@ -131,12 +136,12 @@ class SearchManager:
         self.view.pages["ResultsPage"].clear_results()
 
         # Identify terms and operators separately
-        terms = re.split(r'([+])', raw_query)
+        terms = re.split(r'([+-])', raw_query)
         token_processor = BasicTokenProcessor()
 
         # Process terms and construct the normalized query
         processed_query_parts = [
-            term if term == '+' else ' '.join(
+            term if term in ['+', '-'] else ' '.join(
                 token_processor.normalize_type(token)
                 for t in EnglishTokenStream(StringIO(term.strip()))
                 for token in token_processor.process_token(t)
