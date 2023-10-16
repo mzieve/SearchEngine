@@ -3,19 +3,17 @@ from typing import Iterator
 import spacy
 
 class SpanishTokenStream(TokenStream):
-    def __init__(self, source):
-        """Constructs a stream over a TextIOWrapper of text."""
+    def __init__(self, source, nlp):
         self.source = source
-        self.nlp = spacy.load("es_core_news_sm")
-        self._open = False
+        self.nlp = nlp
 
     def __iter__(self) -> Iterator[str]:
-        """Returns an iterator over the tokens in the stream."""
-        for token in self.source:
-            doc = self.nlp(token)
-            for tok in doc:
-                if len(tok.text) > 0:
-                    yield tok.text
+        text = ' '.join(self.source) if hasattr(self.source, '__iter__') else self.source.read()
+        doc = self.nlp(text)
+
+        for token in doc:
+            if len(token.text) > 0:
+                yield token.text
 
     # Resource management functions.
     def __enter__(self):

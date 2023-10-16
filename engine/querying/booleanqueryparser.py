@@ -1,4 +1,5 @@
 from . import AndQuery, OrQuery, QueryComponent, TermLiteral, PhraseLiteral
+from engine.text import Preprocessing
 
 class BooleanQueryParser:
     class _StringBounds:
@@ -43,7 +44,7 @@ class BooleanQueryParser:
         return BooleanQueryParser._StringBounds(start_index, length_out) 
             
     @staticmethod
-    def _find_next_literal(subquery: str, start_index: int) -> 'BooleanQueryParser._Literal':
+    def _find_next_literal(subquery: str, start_index: int, preprocess: Preprocessing) -> 'BooleanQueryParser._Literal':
         sub_length = len(subquery)
         length_out = 0
 
@@ -56,11 +57,13 @@ class BooleanQueryParser:
             next_quote = subquery.find('"', start_index + 1)
             if next_quote >= 0:
                 phrase_contents = subquery[start_index + 1:next_quote]
+                phrase_contents = preprocess.process(phrase_contents)
                 length_out = next_quote - start_index + 1 
 
                 # Modification: Check if phrase_contents contain more than one word
                 if ' ' in phrase_contents:
-                    phrase_literals = BooleanQueryParser.parse_query(phrase_contents)
+                    phrase_literals = BooleanQueryParser.parse_query(phrase_contents, preprocess)
+                    print("Phrase Literals:", phrase_literals)
                     return BooleanQueryParser._Literal(
                         BooleanQueryParser._StringBounds(start_index, length_out),
                         PhraseLiteral(phrase_literals.components)  # Keep as PhraseLiteral
@@ -91,13 +94,15 @@ class BooleanQueryParser:
         else:
             length_out = next_space - start_index
         
+        term = preprocess.process(subquery[start_index:start_index + length_out])
+     
         return BooleanQueryParser._Literal(
             BooleanQueryParser._StringBounds(start_index, length_out),
-            TermLiteral(subquery[start_index:start_index + length_out])
+            TermLiteral(term)
         )
 
     @staticmethod
-    def parse_query(query : str) -> QueryComponent:
+    def parse_query(query : str, preprocess: Preprocessing) -> QueryComponent:
         all_subqueries = []
         start = 0
 
@@ -113,7 +118,7 @@ class BooleanQueryParser:
 
             while True:
                 # Extract the next literal from the subquery.
-                lit = BooleanQueryParser._find_next_literal(subquery, sub_start)
+                lit = BooleanQueryParser._find_next_literal(subquery, sub_start, preprocess)
 
                 # Add the literal component to the conjunctive list.
                 subquery_literals.append(lit.literal_component)

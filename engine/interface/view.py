@@ -94,8 +94,8 @@ class HomePage(tk.Frame):
         """Add the search entry box to the GUI."""
         self.search_entry = tk.Entry(
             self.centered_frame, width=90, borderwidth=25, bg='#ffffff',
-            insertbackground='black', bd=1, relief='flat', fg="#000000",
-            highlightthickness=2, highlightbackground="light grey"
+            insertbackground='#919190', bd=1, relief='flat', fg="#000000",
+            highlightthickness=1, highlightbackground="#c7c6c5"
         )
         self.search_entry.grid(row=1, column=0, columnspan=3, ipady=8, pady=5)
         self.search_entry.insert(0, query)

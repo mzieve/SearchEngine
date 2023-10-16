@@ -7,7 +7,16 @@ class SpanishTokenProcessor(TokenProcessor):
 
     def process_token(self, token):
         """Processes tokens into types."""
-        return token.lower()
+        doc = self.nlp(token)
+        processed_tokens = []
+
+        for tok in doc:
+            if tok.is_alpha:
+                alpha_text = ''.join(filter(str.isalnum, tok.text.lower()))
+                if alpha_text:
+                    processed_tokens.append(alpha_text)
+
+        return processed_tokens
 
     def normalize_type(self, type_):
         """Normalizes types into terms using spaCy lemmatization."""
