@@ -19,9 +19,6 @@ class PhraseLiteral(QueryComponent):
         if not postings_lists or not all(postings_lists):
             return []
 
-        for literal, postings in zip(self.literals, postings_lists):
-            print(f"'{literal}': {postings}")
-
         result_postings = postings_lists[0]
         k = len(self.literals) - 1
         for next_postings in postings_lists[1:]:

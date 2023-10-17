@@ -74,7 +74,7 @@ class SearchManager:
 
             self._display_search_results(postings, query)
 
-        except SpecificException as e: 
+        except Exception as e:
             self._handle_search_error(e)
 
     def _corpus_ready(self):
@@ -103,6 +103,8 @@ class SearchManager:
         return postings
 
     def _display_search_results(self, postings, query):
+        results = len(postings)
+        print(results)
         for posting in postings:
             doc = next((d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None)
             if doc:

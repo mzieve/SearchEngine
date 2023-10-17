@@ -58,7 +58,7 @@ class BooleanQueryParser:
 
         # Check if this is a NOT component
         if subquery[start_index] == '-':
-            literal = BooleanQueryParser._find_next_literal(subquery, start_index + 1)
+            literal = BooleanQueryParser._find_next_literal(subquery, start_index + 1, preprocess)
             return BooleanQueryParser._Literal(
                 BooleanQueryParser._StringBounds(start_index, literal.bounds.length + 1),
                 NotQuery(literal.literal_component)
