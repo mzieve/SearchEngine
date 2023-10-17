@@ -3,17 +3,17 @@ from engine.indexing import Index, Posting
 from .notquery import NotQuery
 
 class AndQuery(QueryComponent):
-    def __init__(self, components : list[QueryComponent]):
+    def __init__(self, components: list[QueryComponent]):
         # please don't rename the "components" field.
         self.components = components
 
-    def getPostings(self, index : Index) -> list[Posting]:
-        #result = []
+    def getPostings(self, index: Index) -> list[Posting]:
+        # result = []
         # TODO: program the merge for an AndQuery, by gathering the postings of the composed QueryComponents and
-		# intersecting the resulting postings.
+        # intersecting the resulting postings.
         result = self.components[0].getPostings(index)
         for component in self.components[1:]:
-            not_component = True if component.is_positive() == False else False
+            not_component = not component.is_positive()
             new_postings = component.getPostings(index)
             result = self._and_op(result, new_postings, not_component)
         return result

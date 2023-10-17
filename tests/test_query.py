@@ -1,4 +1,4 @@
-from engine.querying import AndQuery, BooleanQueryParser, OrQuery, TermLiteral, PhraseLiteral
+from engine.querying import AndQuery, BooleanQueryParser, OrQuery, NotQuery, TermLiteral, PhraseLiteral
 from engine.indexing import Posting
 import pytest
 
@@ -30,4 +30,13 @@ def test_parse_mixed_query():
     assert isinstance(query_component.components[0], AndQuery)
     assert len(query_component.components[0].components) == 2
     assert isinstance(query_component.components[1], AndQuery)
-        
+
+def test_and_not_query():
+    query_str = 'cat -dog'
+    query_component = BooleanQueryParser.parse_query(query_str)
+    assert isinstance(query_component, AndQuery)
+    assert len(query_component.components) == 2
+    assert isinstance(query_component.components[0], TermLiteral)
+    assert query_component.components[0].term == 'cat'
+    assert isinstance(query_component.components[1], NotQuery)
+    assert (query_component.components[1].component.term == 'dog')
