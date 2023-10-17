@@ -99,7 +99,6 @@ class SearchManager:
             self.home_warning_label.config(text="Invalid Query. Please enter a valid search query.")
             return []
 
-        print(self.preprocess.p_i_index.getVocabulary())
         postings = query.getPostings(self.preprocess.p_i_index)
         return postings
 
@@ -148,8 +147,8 @@ class UIManager:
                                          bg='#ffffff', 
                                          font=("Arial", 10))
 
-        self.progress.grid(row=3, column=0, columnspan=3, pady=5, padx=50)
-        self.progress_info_label.grid(row=4, column=0, columnspan=3, pady=5)
+        self.progress.grid(row=3, column=0, columnspan=3, pady=0, padx=50)
+        self.progress_info_label.grid(row=4, column=0, columnspan=3, pady=0)
         
         # Start the indexing
         self.corpus_manager.index_corpus(self.update_progress_ui)

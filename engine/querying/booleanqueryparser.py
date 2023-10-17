@@ -63,7 +63,7 @@ class BooleanQueryParser:
                 # Modification: Check if phrase_contents contain more than one word
                 if ' ' in phrase_contents:
                     phrase_literals = BooleanQueryParser.parse_query(phrase_contents, preprocess)
-                    print("Phrase Literals:", phrase_literals)
+
                     return BooleanQueryParser._Literal(
                         BooleanQueryParser._StringBounds(start_index, length_out),
                         PhraseLiteral(phrase_literals.components)  # Keep as PhraseLiteral
