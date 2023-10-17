@@ -82,7 +82,7 @@ class HomePage(tk.Frame):
         self._add_home_search_entry()
         self._add_search_button()
 
-        self.progress_filler = tk.Label(self.centered_frame, text="", bg=BG_COLOR, height=4, width=40)
+        self.progress_filler = tk.Label(self.centered_frame, text="", bg=BG_COLOR, height=1, width=40)
         self.progress_filler.grid(row=3, column=0, columnspan=3, pady=5, padx=50, rowspan=2)
 
     def _add_home_logo(self):
@@ -93,9 +93,7 @@ class HomePage(tk.Frame):
     def _add_home_search_entry(self, query=""):
         """Add the search entry box to the GUI."""
         self.search_entry = tk.Entry(
-            self.centered_frame, width=90, borderwidth=25, bg='#ffffff',
-            insertbackground='black', bd=1, relief='flat', fg="#000000",
-            highlightthickness=2, highlightbackground="light grey"
+            self.centered_frame, width=90, bg='#ffffff',
         )
         self.search_entry.grid(row=1, column=0, columnspan=3, ipady=8, pady=5)
         self.search_entry.insert(0, query)
@@ -177,15 +175,9 @@ class ResultsPage(tk.Frame):
     def _add_results_search_entry(self, query):
         entry_font = font.Font(size=14)
         self.results_search_entry = tk.Entry(
-            self.top_frame, width=50, 
-            borderwidth=5, 
-            bg='#ffffff',
-            insertbackground='#f2f2f2', 
-            bd=1, 
-            relief='flat', 
-            fg="#000000",
-            highlightthickness=1, 
-            highlightbackground="#c9c7c7", 
+            self.top_frame, 
+            width=50, 
+            bg='#ffffff', 
             font=entry_font
         )
         self.results_search_entry.grid(row=0, column=1, sticky='w')
@@ -242,11 +234,9 @@ class ResultsPage(tk.Frame):
         ).grid(row=1, column=0, sticky='w', pady=(0, 0))
 
         if content_sentence:
-            words = content_sentence.split()
-            truncated_content = ' '.join(words[:25]) + '...' if len(words) > 25 else content_sentence
             tk.Label(
                 result_frame,
-                text=truncated_content,
+                text=content_sentence,
                 font=("Arial", 10),
                 fg="grey",
                 bg='#ffffff',

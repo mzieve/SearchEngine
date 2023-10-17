@@ -1,52 +1,119 @@
-from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
-from engine.text import BasicTokenProcessor, EnglishTokenStream
+from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument, XMLDocument
+from engine.text import BasicTokenProcessor, SpanishTokenProcessor, EnglishTokenStream, SpanishTokenStream, Preprocessing
 from engine.indexing import Index, PositionalInvertedIndex
 from engine.querying import BooleanQueryParser
 from tkinter import filedialog, Label, ttk
 from pathlib import Path
-from io import StringIO
-from datetime import timedelta
-from .decorators import threaded
+from io import StringIO, TextIOWrapper
+from .decorators import threaded, threaded_value
 import time
-import threading
 import re
 import traceback
 import queue
+import io
+import builtins
+import config
 
 class CorpusManager:
     def __init__(self):
         self.corpus = None
-        self.p_i_index = PositionalInvertedIndex()
-        self.processor = BasicTokenProcessor()
+        self.preprocess = Preprocessing()
 
     def load_corpus(self, folder_selected):
         extension_factories = {
             '.txt': TextFileDocument.load_from,
-            '.json': JsonDocument.load_from
+            '.json': JsonDocument.load_from,
+            '.xml': XMLDocument.load_from
         }
         self.corpus = DirectoryCorpus.load_directory(folder_selected, extension_factories)
         return self.corpus
 
     def index_corpus(self, progress_callback=None):
-        """
-        Indexes the corpus.
-        :param progress_callback:
-        :return:
-        """
-        for i, doc_path in enumerate(self.corpus):
-            tokens = EnglishTokenStream(doc_path.get_content())
-            position = 0
-            for token in tokens:
-                position += 1
-                types = self.processor.process_token(token)
-                for type in types:
-                    term = self.processor.normalize_type(type)
-                    self.p_i_index.addTerm(term, doc_path.id, position)
+        # Detect the language using the first document in the corpus
+        first_doc_content = self.corpus[0].get_content()
+        if isinstance(first_doc_content, io.TextIOWrapper):
+            lang_content = first_doc_content.read()
+        else:
+            lang_content = ' '.join(first_doc_content)
+        
+        language = self.preprocess.detect_language(lang_content)
+        config.LANGUAGE = language
 
-            if progress_callback:
-                progress_callback(i)
+        return self.preprocess.dic_process_position(self.corpus, progress_callback)
 
-        return self.p_i_index.getVocabulary()
+class SearchManager:
+    def __init__(self, corpus_manager, preprocess, view, search_entry, results_search_entry, home_warning_label, canvas):
+        self.corpus_manager = corpus_manager
+        self.view = view
+        self.search_entry = search_entry
+        self.results_search_entry = results_search_entry
+        self.home_warning_label = home_warning_label
+        self.canvas = canvas
+        self.preprocess = preprocess
+
+    def perform_search(self):
+        if not self._corpus_ready():
+            return
+
+        raw_query = self._get_raw_query()
+
+        if not raw_query: 
+            self.home_warning_label.config(text="Please enter a search query.")
+            return
+
+        self.view.pages["ResultsPage"].show_results_page(raw_query)
+        self._prepare_results_page()
+
+        try:
+            query = BooleanQueryParser.parse_query(raw_query, self.preprocess)
+            postings = self._get_postings(query)
+
+            if not postings:
+                self.view.pages["ResultsPage"].display_no_results_warning()
+                return
+
+            self._display_search_results(postings, query)
+
+        except SpecificException as e: 
+            self._handle_search_error(e)
+
+    def _corpus_ready(self):
+        if not self.corpus_manager.corpus:
+            self.home_warning_label.config(text="Please load a corpus first.")
+            return False
+        return True
+
+    def _get_raw_query(self):
+        if self.view.pages["HomePage"].winfo_ismapped():
+            return self.view.pages["HomePage"].search_entry.get()
+        return self.view.pages["ResultsPage"].results_search_entry.get()
+
+    def _prepare_results_page(self):
+        if not self.view.pages["ResultsPage"].winfo_ismapped():
+            self.view.show_page("ResultsPage")
+        self.view.pages["ResultsPage"].clear_results()
+
+
+    def _get_postings(self, query):
+        if not query:
+            self.home_warning_label.config(text="Invalid Query. Please enter a valid search query.")
+            return []
+
+        postings = query.getPostings(self.preprocess.p_i_index)
+        return postings
+
+    def _display_search_results(self, postings, query):
+        for posting in postings:
+            doc = next((d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None)
+            if doc:
+                self.view.pages["ResultsPage"].add_search_result_to_window(doc.id, doc.title, None)
+        self.canvas.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _handle_search_error(self, exception):
+        self.view.pages["ResultsPage"].display_no_results_warning(str(exception))
+        print("Error during search:", str(exception))
+        traceback.print_exc()
 
 class UIManager:
     def __init__(self, master, view, corpus_manager, search_manager):
@@ -80,8 +147,8 @@ class UIManager:
                                          bg='#ffffff', 
                                          font=("Arial", 10))
 
-        self.progress.grid(row=3, column=0, columnspan=3, pady=5, padx=50)
-        self.progress_info_label.grid(row=4, column=0, columnspan=3, pady=5)
+        self.progress.grid(row=3, column=0, columnspan=3, pady=0, padx=50)
+        self.progress_info_label.grid(row=4, column=0, columnspan=3, pady=0)
         
         # Start the indexing
         self.corpus_manager.index_corpus(self.update_progress_ui)
@@ -104,101 +171,3 @@ class UIManager:
 
     def show_warning(self, message):
         self.view.pages["HomePage"].home_warning_label.config(text=message)
-
-
-class SearchManager:
-    def __init__(self, corpus_manager, view, search_entry, results_search_entry, home_warning_label, canvas):
-        self.corpus_manager = corpus_manager
-        self.processor = BasicTokenProcessor()
-        self.view = view
-        self.search_entry = search_entry
-        self.results_search_entry = results_search_entry
-        self.home_warning_label = home_warning_label
-        self.canvas = canvas
-
-    def perform_search(self):
-        if not self.corpus_manager.corpus or not self.corpus_manager.p_i_index:
-            self.home_warning_label.config(text="Please load a corpus first.")
-            return
-
-        if self.view.pages["HomePage"].winfo_ismapped():
-            raw_query = self.view.pages["HomePage"].search_entry.get()
-        else:
-            raw_query = self.view.pages["ResultsPage"].results_search_entry.get()
-
-        if not raw_query:
-            self.home_warning_label.config(text="Please enter a search query.")
-            return
-
-        if not self.view.pages["ResultsPage"].winfo_ismapped():
-            self.view.show_page("ResultsPage")
-
-        self.view.pages["ResultsPage"].clear_results()
-
-        # Identify terms and operators separately
-        terms = re.split(r'([+-])', raw_query)
-        token_processor = BasicTokenProcessor()
-
-        # Process terms and construct the normalized query
-        processed_query_parts = [
-            term if term in ['+', '-'] else ' '.join(
-                token_processor.normalize_type(token)
-                for t in EnglishTokenStream(StringIO(term.strip()))
-                for token in token_processor.process_token(t)
-            ) for term in terms
-        ]
-        normalized_query = ''.join(processed_query_parts)
-
-        try:
-            self.view.pages["ResultsPage"].show_results_page(raw_query)
-
-            parsed_query = BooleanQueryParser.parse_query(normalized_query)
-            if not parsed_query:
-                self.home_warning_label.config(text="Invalid Query. Please enter a valid search query.")
-                return
-
-            postings = parsed_query.getPostings(self.corpus_manager.p_i_index)
-            found_docs = {posting.doc_id for posting in postings}
-
-            if not found_docs: 
-                self.view.pages["ResultsPage"].display_no_results_warning()
-                return
-
-            for doc_id in found_docs:
-                doc = next((d for d in self.corpus_manager.corpus if d.id == doc_id), None)
-
-                if doc:
-                    # Extract a sentence containing the parsed query and display the search result
-                    content_sentence = self.find_sentence_containing_query(''.join(doc.get_content()), normalized_query)
-                    self.view.pages["ResultsPage"].add_search_result_to_window(doc.id, doc.title, content_sentence)
-
-            self.canvas.update_idletasks()
-            self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-        except Exception as e:
-            self.view.pages["ResultsPage"].display_no_results_warning(str(e))
-            print("Error during search:", str(e))
-            traceback.print_exc()
-
-    def find_sentence_containing_query(self, document_content, query):
-        sentences = re.split(r'(?<=[.!?])\s+', document_content)
-        query_tokens = set(
-            self.processor.normalize_type(t) 
-            for word in query.split() 
-            for t in self.processor.process_token(word)
-        )
-
-        for i, sentence in enumerate(sentences):
-            sentence_tokens = set(
-                self.processor.normalize_type(t)
-                for word in sentence.split() 
-                for t in self.processor.process_token(word)
-            )
-            if query_tokens & sentence_tokens:
-                return ' '.join((
-                    sentences[i-1] if i-1 >= 0 else "",
-                    sentence,
-                    sentences[i+1] if i+1 < len(sentences) else ""
-                )).strip()
-        return None
-    

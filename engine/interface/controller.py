@@ -17,6 +17,7 @@ class SearchController:
 
         # Initialize the SearchManager
         self.search_manager = SearchManager(corpus_manager=self.corpus_manager,
+                                            preprocess=self.corpus_manager.preprocess,
                                             view=None, 
                                             search_entry=None,
                                             results_search_entry=None,
