@@ -29,12 +29,17 @@ class XMLDocument(Document):
         # Define namespace dictionary
         ns = {"tei": "http://www.tei-c.org/ns/1.0"}
 
-        # Extract the title inside the <head> tag
-        head_title_element = root.find("./tei:text/tei:body/tei:head/tei:title", namespaces=ns)
-        title = head_title_element.text if head_title_element is not None else ""
+        # Attempt to extract the title using a priority list
+        potential_title_tags = ["./tei:title", "./tei:head/tei:title", "./tei:text/tei:body/tei:head/tei:title"]
+        title = ""
+        for tag in potential_title_tags:
+            title_element = root.find(tag, namespaces=ns)
+            if title_element is not None and title_element.text:
+                title = title_element.text
+                break
 
-        # Extract the content
-        lines = root.findall(".//tei:text//tei:l", namespaces=ns)
-        content = "\n".join(line.text for line in lines if line.text is not None)
+        # Extract all text content from the XML
+        texts = [elem.text for elem in tree.iter() if elem.text and not elem.text.isspace()]
+        content = "\n".join(texts)
 
         return XMLDocument(doc_id, title, content)

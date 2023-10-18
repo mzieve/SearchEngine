@@ -76,14 +76,10 @@ class HomePage(tk.Frame):
         self.centered_frame.rowconfigure(1, weight=1)  
         self.centered_frame.rowconfigure(2, weight=1)
         self.centered_frame.rowconfigure(3, weight=1)  
-        self.centered_frame.rowconfigure(4, weight=1)
 
         self._add_home_logo()
         self._add_home_search_entry()
         self._add_search_button()
-
-        self.progress_filler = tk.Label(self.centered_frame, text="", bg=BG_COLOR, height=1, width=40)
-        self.progress_filler.grid(row=3, column=0, columnspan=3, pady=5, padx=50, rowspan=2)
 
     def _add_home_logo(self):
         """Add the application logo to the GUI."""
@@ -93,7 +89,7 @@ class HomePage(tk.Frame):
     def _add_home_search_entry(self, query=""):
         """Add the search entry box to the GUI."""
         self.search_entry = tk.Entry(
-            self.centered_frame, width=90, bg='#ffffff',
+            self.centered_frame, width=90, bg='#ffffff', insertbackground='black'
         )
         self.search_entry.grid(row=1, column=0, columnspan=3, ipady=8, pady=5)
         self.search_entry.insert(0, query)
@@ -147,7 +143,7 @@ class ResultsPage(tk.Frame):
 
         self.results_search_entry = None
 
-        # AAdd Canvas
+        # Add Canvas
         self.canvas = tk.Canvas(self, bg='#ffffff', highlightthickness=0)
         self.canvas.grid(row=2, column=0, sticky="nsew", columnspan=2, pady=(5, 0))
 
@@ -162,6 +158,9 @@ class ResultsPage(tk.Frame):
         # Add result frame to canvas
         self.results_frame = tk.Frame(self.canvas, bg='#ffffff', bd=0, relief='flat')
         self.canvas.create_window((0, 0), window=self.results_frame, anchor="nw")
+
+        # Label for displaying the number of results
+        self.results_count_label = None
 
     def show_results_page(self, query):
         """Show the Logo and Entry for Results"""
@@ -178,6 +177,7 @@ class ResultsPage(tk.Frame):
             self.top_frame, 
             width=50, 
             bg='#ffffff', 
+            insertbackground='black',
             font=entry_font
         )
         self.results_search_entry.grid(row=0, column=1, sticky='w')
@@ -247,5 +247,21 @@ class ResultsPage(tk.Frame):
 
     def clear_results(self):
         """Clear all displayed search results and reset Canvas's scroll region."""
+        temp_frame = tk.Frame(self.results_frame)
         for widget in self.results_frame.winfo_children():
-            widget.destroy()
+            widget.grid_forget()
+            widget.master = temp_frame
+        temp_frame.destroy()
+
+    def update_results_count(self, count):
+        if self.results_count_label:
+            self.results_count_label.destroy()
+
+        message = f"About {count} results"
+        self.results_count_label = tk.Label(self.results_frame, 
+            text=message, 
+            font=("Arial", 9), 
+            bg='#ffffff',
+            fg='grey'
+            )
+        self.results_count_label.grid(sticky='w', padx=150, pady=(5, 0))
