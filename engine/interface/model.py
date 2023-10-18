@@ -51,6 +51,7 @@ class SearchManager:
         self.canvas = canvas
         self.preprocess = preprocess
 
+    @threaded
     def perform_search(self):
         if not self._corpus_ready():
             return
@@ -62,6 +63,7 @@ class SearchManager:
             return
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
+        self.view.master.update_idletasks()
         self._prepare_results_page()
 
         try:
@@ -72,9 +74,9 @@ class SearchManager:
                 self.view.pages["ResultsPage"].display_no_results_warning()
                 return
 
-            self._display_search_results(postings, query)
+            self.view.master.after(1, self._display_search_results, postings, query)
 
-        except Exception as e:
+        except Exception as e: 
             self._handle_search_error(e)
 
     def _corpus_ready(self):
@@ -104,13 +106,24 @@ class SearchManager:
 
     def _display_search_results(self, postings, query):
         results = len(postings)
-        print(results)
+        self.view.pages["ResultsPage"].update_results_count(results)
+
+        self.canvas.configure(scrollregion=(0, 0, 0, 0))
+        
+        counter = 0
+        result_counter = 10
+
         for posting in postings:
             doc = next((d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None)
             if doc:
                 self.view.pages["ResultsPage"].add_search_result_to_window(doc.id, doc.title, None)
-        self.canvas.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+            counter += 1
+            if counter % result_counter == 0:
+                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+                self.canvas.update_idletasks()
+
+        self.canvas.yview_moveto(0)
 
     def _handle_search_error(self, exception):
         self.view.pages["ResultsPage"].display_no_results_warning(str(exception))
@@ -146,7 +159,8 @@ class UIManager:
 
         self.progress_info_label = Label(self.view.pages["HomePage"].centered_frame, 
                                          text="Progress: 0%", 
-                                         bg='#ffffff', 
+                                         bg='#ffffff',
+                                         fg='#000000', 
                                          font=("Arial", 10))
 
         self.progress.grid(row=3, column=0, columnspan=3, pady=0, padx=50)
@@ -166,7 +180,6 @@ class UIManager:
         self.progress_info_label.config(text=f"Progress: {percentage_complete:.1f}%")
         self.view.master.update_idletasks()  
 
-    @threaded
     def perform_search_ui(self):
         # UI interactions for the search operation run in a new thread
         self.search_manager.perform_search()
