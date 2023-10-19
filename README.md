@@ -79,3 +79,57 @@ Implement either wildcard queries (using a k-gram index) or author queries (wher
 
 Quality & Ambition
 You cannot directly earn points on this requirement, unless you are going for Excellent, in which case you can start planning a difficult addition to the search engine such as spelling correction or a graphical user interface. Speak to the instructor first.
+
+## Project Milestone 2
+
+### Requirements
+
+### Indexing (update)
+To earn a Good, you must build an index on disk, and only read postings for the terms needed to satisfy a query. (I.e., you cannot read the entire index back into memory.) You must follow the format developed in lecture: dft, doc id, tftd, positions, repeated; using gaps for document IDs and positions.
+
+You must ALSO compute the length of each document, L_d, during indexing time, and save those values on disk to a file docWeights.bin in document ID order. To compute L_d for a given document d, you must add up the square of the values for each term in that document, and then take the square root of that sum. (This is the Euclidian length of the document's vector.) This 8-byte floating point value should be written to docWeights.bin.
+
+You will create a new Index class, DiskPositionalIndex, for reading postings from a disk index file. See the document from earlier for details. This class should have two methods for reading postings: one that includes positions, and one that skips over them (since only phrase queries require positions, all other Boolean and ranked query objects should not read positions from disk).
+
+
+#### DiskIndexWriter
+Create a class called DiskIndexWriter. Write a method writeIndex taking parameters for an existing, initialized in-memory PositionalInvertedIndex, along with a path of where to save the on-disk index. In the method, you will need to create/open a file in binary mode to store your postings; I recommend calling it postings.bin. In Java, you should use the RandomAccessFile class to open the file; in Python, use open(..., "rb"); and in C++, create an ofstream object and use .open(..., ios::binary)
+
+Retrieve the vocabulary from the index, and loop through each term in the vocab list. Get the postings list for a term, then write the list to disk using our format: first dft, then a doc id gap, then tftd, then a bunch of position gaps, repeating. Easy!
+
+Java: use writeInt
+Python: use write along with struct.pack (look it up)
+C++: you may want to ensure your bytes are in big-endian order, and rearrange if not; then use .write().
+
+As you finish each term in the vocabulary, you will want to record the byte position of where the postings for that term started. That information needs to be stored in a database; you can use SQLite if you don't know any other library. 
+
+#### DiskPositionalIndex
+Create a new class DiskPositionalIndex that extends your Index interface. You should construct a DiskPositionalIndex with a path identifying where its files are located. The index can open those files, but should not read them until postings are actually needed, and even then should only read the data for the required index term, and NOT just read the entire index at once.
+
+To implement getPostings(String term):
+
+1. Use your database to load the byte position of where the term's postings begin.
+2. Using your already-opened postings.bin file, seek to the position of the term.
+3. Using readInt (Java), read() w/ struct.unpack (Python), or .read() (C++), read dft, then docid gap, then tftd, then position gap, etc. etc. As values are read, construct in-memory Posting objects to store the information, then return a List of Postings when you have read everything you need from disk.
+
+Nothing in your Query code should change. You will simply pass your DiskPositionIndex to QueryComponent.getPostings, and the components themselves will just call getPostings on your index to do their merges. They don't care where the postings come from!
+
+### Ranked Querying
+Besides on-disk indexing, this is the major focus of milestone 2. 
+
+Add a mode to your search engine to ranked query an on-disk index. Write a method to perform ranked retrieval on a given index for a given set of query terms, by implementing the loop from class:
+
+* for each term t in the query:
+	* Calculate wqt, using the formula 
+	* For each document d in t's postings list:
+		* Calculate 
+		* Acquire an accumulator A_d for document d
+		* Increase the accumulator by 
+* for each accumulator A_d:
+	* divide A_d by L_d, which your DiskPositionalIndex class should be able to read from your docWeights.bin file.
+	* put the quotient into a priority queue
+* Using the priority queue, return the top 10 documents and their scores.
+
+When printing a ranked query to the user, please include document titles as well as the score assigned that document. 
+
+
