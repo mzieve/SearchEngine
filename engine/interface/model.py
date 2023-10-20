@@ -1,5 +1,17 @@
-from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument, XMLDocument
-from engine.text import BasicTokenProcessor, SpanishTokenProcessor, EnglishTokenStream, SpanishTokenStream, Preprocessing
+from engine.documents import (
+    DocumentCorpus,
+    DirectoryCorpus,
+    TextFileDocument,
+    JsonDocument,
+    XMLDocument,
+)
+from engine.text import (
+    BasicTokenProcessor,
+    SpanishTokenProcessor,
+    EnglishTokenStream,
+    SpanishTokenStream,
+    Preprocessing,
+)
 from engine.indexing import Index, PositionalInvertedIndex
 from engine.querying import BooleanQueryParser
 from tkinter import filedialog, Label, ttk
@@ -14,6 +26,7 @@ import io
 import builtins
 import config
 
+
 class CorpusManager:
     def __init__(self):
         self.corpus = None
@@ -21,11 +34,13 @@ class CorpusManager:
 
     def load_corpus(self, folder_selected):
         extension_factories = {
-            '.txt': TextFileDocument.load_from,
-            '.json': JsonDocument.load_from,
-            '.xml': XMLDocument.load_from
+            ".txt": TextFileDocument.load_from,
+            ".json": JsonDocument.load_from,
+            ".xml": XMLDocument.load_from,
         }
-        self.corpus = DirectoryCorpus.load_directory(folder_selected, extension_factories)
+        self.corpus = DirectoryCorpus.load_directory(
+            folder_selected, extension_factories
+        )
         return self.corpus
 
     def index_corpus(self, progress_callback=None):
@@ -34,15 +49,25 @@ class CorpusManager:
         if isinstance(first_doc_content, io.TextIOWrapper):
             lang_content = first_doc_content.read()
         else:
-            lang_content = ' '.join(first_doc_content)
-        
+            lang_content = " ".join(first_doc_content)
+
         language = self.preprocess.detect_language(lang_content)
         config.LANGUAGE = language
 
         return self.preprocess.dic_process_position(self.corpus, progress_callback)
 
+
 class SearchManager:
-    def __init__(self, corpus_manager, preprocess, view, search_entry, results_search_entry, home_warning_label, canvas):
+    def __init__(
+        self,
+        corpus_manager,
+        preprocess,
+        view,
+        search_entry,
+        results_search_entry,
+        home_warning_label,
+        canvas,
+    ):
         self.corpus_manager = corpus_manager
         self.view = view
         self.search_entry = search_entry
@@ -58,7 +83,7 @@ class SearchManager:
 
         raw_query = self._get_raw_query()
 
-        if not raw_query: 
+        if not raw_query:
             self.home_warning_label.config(text="Please enter a search query.")
             return
 
@@ -76,7 +101,7 @@ class SearchManager:
 
             self.view.master.after(1, self._display_search_results, postings, query)
 
-        except Exception as e: 
+        except Exception as e:
             self._handle_search_error(e)
 
     def _corpus_ready(self):
@@ -95,10 +120,11 @@ class SearchManager:
             self.view.show_page("ResultsPage")
         self.view.pages["ResultsPage"].clear_results()
 
-
     def _get_postings(self, query):
         if not query:
-            self.home_warning_label.config(text="Invalid Query. Please enter a valid search query.")
+            self.home_warning_label.config(
+                text="Invalid Query. Please enter a valid search query."
+            )
             return []
 
         postings = query.getPostings(self.preprocess.p_i_index)
@@ -109,14 +135,18 @@ class SearchManager:
         self.view.pages["ResultsPage"].update_results_count(results)
 
         self.canvas.configure(scrollregion=(0, 0, 0, 0))
-        
+
         counter = 0
         result_counter = 10
 
         for posting in postings:
-            doc = next((d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None)
+            doc = next(
+                (d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None
+            )
             if doc:
-                self.view.pages["ResultsPage"].add_search_result_to_window(doc.id, doc.title, None)
+                self.view.pages["ResultsPage"].add_search_result_to_window(
+                    doc.id, doc.title, None
+                )
 
             counter += 1
             if counter % result_counter == 0:
@@ -129,6 +159,7 @@ class SearchManager:
         self.view.pages["ResultsPage"].display_no_results_warning(str(exception))
         print("Error during search:", str(exception))
         traceback.print_exc()
+
 
 class UIManager:
     def __init__(self, master, view, corpus_manager, search_manager):
@@ -151,21 +182,25 @@ class UIManager:
         # Calculate number of documents
         self.total_documents = sum(1 for _ in self.corpus_manager.corpus)
 
-        self.progress = ttk.Progressbar(self.view.pages["HomePage"].centered_frame, 
-                                        orient='horizontal', 
-                                        length=300, 
-                                        mode='determinate', 
-                                        maximum=self.total_documents) 
+        self.progress = ttk.Progressbar(
+            self.view.pages["HomePage"].centered_frame,
+            orient="horizontal",
+            length=300,
+            mode="determinate",
+            maximum=self.total_documents,
+        )
 
-        self.progress_info_label = Label(self.view.pages["HomePage"].centered_frame, 
-                                         text="Progress: 0%", 
-                                         bg='#ffffff',
-                                         fg='#000000', 
-                                         font=("Arial", 10))
+        self.progress_info_label = Label(
+            self.view.pages["HomePage"].centered_frame,
+            text="Progress: 0%",
+            bg="#ffffff",
+            fg="#000000",
+            font=("Arial", 10),
+        )
 
         self.progress.grid(row=3, column=0, columnspan=3, pady=0, padx=50)
         self.progress_info_label.grid(row=4, column=0, columnspan=3, pady=0)
-        
+
         # Start the indexing
         self.corpus_manager.index_corpus(self.update_progress_ui)
 
@@ -176,9 +211,9 @@ class UIManager:
     def update_progress_ui(self, current_document_index):
         """Update the progress UI based on the indexed documents."""
         percentage_complete = (current_document_index / self.total_documents) * 100
-        self.progress['value'] = current_document_index
+        self.progress["value"] = current_document_index
         self.progress_info_label.config(text=f"Progress: {percentage_complete:.1f}%")
-        self.view.master.update_idletasks()  
+        self.view.master.update_idletasks()
 
     def perform_search_ui(self):
         # UI interactions for the search operation run in a new thread

@@ -2,6 +2,7 @@ from .querycomponent import QueryComponent
 from engine.indexing import Index, Posting
 from .notquery import NotQuery
 
+
 class AndQuery(QueryComponent):
     def __init__(self, components: list[QueryComponent]):
         # please don't rename the "components" field.

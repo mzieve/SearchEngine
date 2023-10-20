@@ -1,8 +1,9 @@
 from abc import ABC, abstractclassmethod, abstractmethod
 from typing import Generator
 
+
 class TokenStream(ABC):
-    """Creates a sequence of string tokens from the contents of another stream, 
+    """Creates a sequence of string tokens from the contents of another stream,
     breaking the bytes of the stream into tokens in some way."""
 
     @abstractmethod

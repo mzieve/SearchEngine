@@ -3,7 +3,12 @@ from pathlib import Path
 from tkinter import filedialog
 import sys
 
-from engine.documents import DocumentCorpus, DirectoryCorpus, TextFileDocument, JsonDocument
+from engine.documents import (
+    DocumentCorpus,
+    DirectoryCorpus,
+    TextFileDocument,
+    JsonDocument,
+)
 from engine.indexing import Index, PositionalInvertedIndex
 from engine.text import BasicTokenProcessor, EnglishTokenStream
 

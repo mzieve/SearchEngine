@@ -1,22 +1,23 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from typing import Iterable
 
+
 class Document(ABC):
-	"""Initialize the Document components."""
-	def __init__(self, docID : int):
-	    self.id = docID  # Initialize the document ID
+    """Initialize the Document components."""
 
-	"""Return the document content as an iterable of strings."""
-	@abstractmethod
-	def get_content(self) -> Iterable[str]:
-	    pass
+    def __init__(self, docID: int):
+        self.id = docID
 
-	"""Return the title of the document. Not implemented here."""
-	def title(self) -> str:
-	    pass
+    @abstractmethod
+    def get_content(self) -> Iterable[str]:
+        """Return the document content as an iterable of strings."""
+        pass
 
-	"""Return the string representation of the Document."""
-	def __str__(self) -> str:
-	    return f"{self.title} (ID {self.id})"
+    @abstractproperty
+    def title(self) -> str:
+        """Return the title of the document. Not implemented here."""
+        pass
 
-	
+    def __str__(self) -> str:
+        """Return the string representation of the Document."""
+        return f"{self.title} (ID {self.id})"

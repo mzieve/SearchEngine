@@ -1,3 +1,4 @@
-""" Config File to manage global variables"""
+from typing import Optional
 
-LANGUAGE = None
+""" Config File to manage global variables"""
+LANGUAGE: Optional[str] = None

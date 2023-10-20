@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import Iterable
 from .document import Document
 
+
 class TextFileDocument(Document):
-    def __init__(self, id : int, path : Path):
+    def __init__(self, id: int, path: Path):
         """Initialize a TextFileDocument instance."""
         super().__init__(id)
         self.path = path
@@ -18,7 +19,6 @@ class TextFileDocument(Document):
         return open(self.path)
 
     @staticmethod
-    def load_from(abs_path : Path, doc_id : int) -> 'TextFileDocument':
+    def load_from(abs_path: Path, doc_id: int) -> "TextFileDocument":
         """Static method to load a TextFileDocument."""
         return TextFileDocument(doc_id, abs_path)
-	

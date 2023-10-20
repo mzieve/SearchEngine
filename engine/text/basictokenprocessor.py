@@ -1,6 +1,7 @@
 from .tokenprocessor import TokenProcessor
 import re
-from stemming.porter2 import stem
+from stemming.porter2 import stem  # type: ignore
+
 
 class BasicTokenProcessor(TokenProcessor):
     def __init__(self):
@@ -10,9 +11,9 @@ class BasicTokenProcessor(TokenProcessor):
         result_types = []
 
         # Handle hyphens
-        if '-' in token:
-            split_tokens = token.split('-')
-            combined_tokens = ''.join(split_tokens)
+        if "-" in token:
+            split_tokens = token.split("-")
+            combined_tokens = "".join(split_tokens)
             result_types.extend(split_tokens)
             result_types.append(combined_tokens)
         else:
@@ -22,7 +23,7 @@ class BasicTokenProcessor(TokenProcessor):
         cleaned_types = []
         for tok in result_types:
             # Remove non-alphanumeric characters from the beginning and end
-            tok = re.sub(r'^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$', '', tok)
+            tok = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", tok)
             # Remove apostrophes or quotation marks
             tok = re.sub(r"[\"']", "", tok)
             # Convert to lowercase

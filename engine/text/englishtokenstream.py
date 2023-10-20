@@ -2,6 +2,7 @@ from email.generator import Generator
 from typing import Iterator
 from .tokenstream import TokenStream
 
+
 class EnglishTokenStream(TokenStream):
     def __init__(self, source):
         """Constructs a stream over a TextIOWrapper of text"""
@@ -17,7 +18,6 @@ class EnglishTokenStream(TokenStream):
                 tok = t.strip()
                 if len(tok) > 0:
                     yield tok
-
 
     # Resource management functions.
     def __enter__(self):

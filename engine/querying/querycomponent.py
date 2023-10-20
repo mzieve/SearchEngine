@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from engine.indexing import Posting
 
+
 class QueryComponent(ABC):
     """
     A QueryComponent is one piece of a larger query, whether that piece is a literal string or represents a merging of
@@ -20,3 +21,7 @@ class QueryComponent(ABC):
         :return:
         """
         return True
+
+    @abstractmethod
+    def matches(self, tokens: set) -> bool:
+        pass
