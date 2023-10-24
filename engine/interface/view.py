@@ -1,6 +1,7 @@
 from tkinter import filedialog, Label, ttk
 import tkinter.font as font
-import tkinter as tk
+from PIL import Image
+import customtkinter # type: ignore
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
@@ -27,7 +28,7 @@ class SearchView:
 
     def _initialize_frames(self):
         """Initializes the primary frames of the GUI."""
-        self.container = tk.Frame(self.master, bg=BG_COLOR)
+        self.container = customtkinter.CTkFrame(self.master)
 
         self.container.grid(row=0, column=0, sticky="nsew")
         self.master.rowconfigure(0, weight=1)
@@ -68,12 +69,12 @@ class SearchView:
             self.pages[page_name].grid(row=0, column=0, sticky="nsew")
 
 
-class HomePage(tk.Frame):
+class HomePage(customtkinter.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent, bg=BG_COLOR)
+        customtkinter.CTkFrame.__init__(self, parent)
         self.controller = controller
 
-        self.centered_frame = tk.Frame(self, bg=BG_COLOR)
+        self.centered_frame = customtkinter.CTkFrame(self)
         self.centered_frame.grid(row=0, column=0, sticky="nsew")
 
         self.columnconfigure(0, weight=1)
@@ -90,19 +91,21 @@ class HomePage(tk.Frame):
 
     def _add_home_logo(self):
         """Add the application logo to the GUI."""
-        logo_label = tk.Label(
+        logo_label = customtkinter.CTkLabel(
             self.centered_frame,
             text="Querlo",
             font=("Arial", 62),
-            fg="#ffffff",
-            bg="#ff5733",
+            fg_color="#7236bf",
+            padx=10,
+            pady=10,
+            text_color="white",
         )
         logo_label.grid(row=0, column=0, pady=(0, 5), padx=100, columnspan=3)
 
     def _add_home_search_entry(self, query=""):
         """Add the search entry box to the GUI."""
-        self.search_entry = tk.Entry(
-            self.centered_frame, width=90, bg="#ffffff", insertbackground="black"
+        self.search_entry = customtkinter.CTkEntry(
+            self.centered_frame, width=500, corner_radius=30
         )
         self.search_entry.grid(row=1, column=0, columnspan=3, ipady=8, pady=5)
         self.search_entry.insert(0, query)
@@ -113,64 +116,53 @@ class HomePage(tk.Frame):
 
     def _add_search_button(self):
         """Add the search button to the GUI."""
-        button_frame = tk.Frame(self.centered_frame, bg="#ffffff")
+        button_frame = customtkinter.CTkFrame(
+            self.centered_frame, fg_color="transparent", width=100
+        )
         button_frame.grid(row=2, column=0, columnspan=3, pady=5)
 
-        search_btn = tk.Button(
+        search_btn = customtkinter.CTkButton(
             button_frame,
             text="Querlo Search",
             command=self.controller.ui_manager.perform_search_ui,
-            bg="#faf5f5",
-            fg="black",
-            height=2,
-            width=15,
-            font=("Arial", 10),
-            relief="flat",
-            highlightthickness=0,
-            highlightbackground="#ffffff",
-            bd=0,
+            height=40,
+            width=120,
+            font=("Arial", 14),
+            fg_color="#4a4a4a",
+            hover_color="#636363",
         )
         search_btn.grid(row=0, column=0, padx=10)
 
-        load_corpus_btn = tk.Button(
+        load_corpus_btn = customtkinter.CTkButton(
             button_frame,
             text="Load Corpus",
             command=self.controller.ui_manager.load_corpus_ui,
-            bg="#faf5f5",
-            fg="black",
-            height=2,
-            width=15,
-            font=("Arial", 10),
-            relief="flat",
-            highlightthickness=0,
-            highlightbackground="#ffffff",
-            bd=0,
+            height=40,
+            width=120,
+            font=("Arial", 14),
+            fg_color="#4a4a4a",
+            hover_color="#636363",
         )
         load_corpus_btn.grid(row=0, column=1, padx=10)
 
-        self.home_warning_label = tk.Label(
-            button_frame, text="", fg="red", bg="#ffffff", font=("Arial", 10)
+        self.home_warning_label = customtkinter.CTkLabel(
+            button_frame, text="", font=("Arial", 10)
         )
         self.home_warning_label.grid(row=1, columnspan=2, pady=10)
 
 
-class ResultsPage(tk.Frame):
+class ResultsPage(customtkinter.CTkFrame):
     def __init__(self, parent, controller):
-        tk.Frame.__init__(self, parent, bg=BG_COLOR)
+        customtkinter.CTkFrame.__init__(self, parent)
         self.controller = controller
+        self.displayed_results = []
 
-        self.top_frame = tk.Frame(self, bg="#ffffff")
+        self.top_frame = customtkinter.CTkFrame(self)
         self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
-
-        self.border_canvas = tk.Canvas(
-            self, height=1, bg="#f0f0f0", bd=0, highlightthickness=0
-        )
-        self.border_canvas.grid(row=1, column=0, sticky="nsew", columnspan=2)
 
         # Configure the row and column weights
         self.rowconfigure(0, weight=0)
-        self.rowconfigure(1, weight=0)
-        self.rowconfigure(2, weight=5)
+        self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
 
@@ -181,23 +173,11 @@ class ResultsPage(tk.Frame):
 
         self.results_search_entry = None
 
-        # Add Canvas
-        self.canvas = tk.Canvas(self, bg="#ffffff", highlightthickness=0)
-        self.canvas.grid(row=2, column=0, sticky="nsew", columnspan=2, pady=(5, 0))
-
-        # Add scrollbar to canvas
-        self.scrollbar = tk.Scrollbar(
-            self, orient="vertical", command=self.canvas.yview, troughcolor="#ffffff"
-        )
-        self.scrollbar.grid(row=2, column=2, sticky="ns")
-
-        # Configure canvas
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
         # Add result frame to canvas
-        self.results_frame = tk.Frame(self.canvas, bg="#ffffff", bd=0, relief="flat")
-        self.canvas.create_window((0, 0), window=self.results_frame, anchor="nw")
+        self.results_frame = customtkinter.CTkScrollableFrame(self)
+        self.results_frame.grid(
+            row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
+        )
 
         # Label for displaying the number of results
         self.results_count_label = None
@@ -208,23 +188,20 @@ class ResultsPage(tk.Frame):
         self._add_results_search_entry(query)
 
     def _add_results_logo(self):
-        logo_label = tk.Label(
+        logo_label = customtkinter.CTkLabel(
             self.top_frame,
             text="Querlo",
             font=("Arial", 26),
-            fg="#ffffff",
-            bg="#ff5733",
+            fg_color="#7236bf",
+            padx=10,
+            pady=10,
+            text_color="white",
         )
         logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
 
     def _add_results_search_entry(self, query):
-        entry_font = font.Font(size=14)
-        self.results_search_entry = tk.Entry(
-            self.top_frame,
-            width=50,
-            bg="#ffffff",
-            insertbackground="black",
-            font=entry_font,
+        self.results_search_entry = customtkinter.CTkEntry(
+            self.top_frame, width=500, corner_radius=25
         )
         self.results_search_entry.grid(row=0, column=1, sticky="w")
         self.results_search_entry.insert(0, query)
@@ -235,12 +212,12 @@ class ResultsPage(tk.Frame):
 
     def display_no_results_warning(self, error_message=None):
         """Display the no results message inside the results frame."""
-        result_frame = tk.Frame(self.results_frame, bg="#ffffff")
+        result_frame = customtkinter.CTkFrame(self.results_frame)
         result_frame.grid(sticky="ew", padx=150)
 
         # Load the image
-        self.image = tk.PhotoImage(file="./img/pow.png")
-        image_label = tk.Label(result_frame, image=self.image, bg="#ffffff")
+        self.image = customtkinter.CTkImage(dark_image=Image.open("./img/pow.png"))
+        image_label = customtkinter.CTkLabel(result_frame, image=self.image, text="")
         image_label.grid(row=1, column=0, sticky="w", padx=10, pady=5)
 
         message = "Your search did not match any Documents \n\nSuggestions: \n\n\u2022Make sure all keywords are spelled correctly. \n\u2022Try different keywords \n\u2022Try more general keywords."
@@ -248,62 +225,49 @@ class ResultsPage(tk.Frame):
         if error_message:
             message += f"\n\nError: {error_message}"
 
-        tk.Label(
+        customtkinter.CTkLabel(
             result_frame,
             text=message,
             font=("Arial", 10),
-            fg="black",
-            bg="#ffffff",
             anchor="w",
-            justify=tk.LEFT,
         ).grid(row=0, column=0, sticky="w", pady=5)
 
-        self.canvas.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self.displayed_results.append(result_frame)
 
-    def add_search_result_to_window(self, doc_id, doc_title, content_sentence):
+    def add_search_result_to_window(self, doc_id, doc_title):
         """Display the Results"""
-        result_frame = tk.Frame(self.results_frame, bg="#ffffff")
-        result_frame.grid(sticky="ew", padx=150)
+        result_frame = customtkinter.CTkFrame(self.results_frame)
+        result_frame.grid(
+            sticky="ew",
+            padx=150,
+        )
 
-        tk.Label(
+        customtkinter.CTkLabel(
             result_frame,
             text=f"Document ID# {doc_id}",
-            font=("Arial", 8),
-            fg="grey",
-            bg="#ffffff",
-        ).grid(row=0, column=0, sticky="w", pady=(15, 0))
+            font=("Helvetica", 11),
+        ).grid(row=0, column=0, sticky="w")
 
-        tk.Label(
-            result_frame, text=doc_title, font=("Arial", 14), fg="#0000EE", bg="#ffffff"
-        ).grid(row=1, column=0, sticky="w", pady=(0, 0))
+        customtkinter.CTkLabel(
+            result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
+        ).grid(row=1, column=0, sticky="w", pady=(0, 25))
 
-        if content_sentence:
-            tk.Label(
-                result_frame,
-                text=content_sentence,
-                font=("Arial", 10),
-                fg="grey",
-                bg="#ffffff",
-                anchor="w",
-                wraplength=600,
-                justify=tk.LEFT,
-            ).grid(row=2, column=0, pady=(0, 5))
+        self.displayed_results.append(result_frame)
 
     def clear_results(self):
         """Clear all displayed search results and reset Canvas's scroll region."""
-        temp_frame = tk.Frame(self.results_frame)
-        for widget in self.results_frame.winfo_children():
-            widget.grid_forget()
-            widget.master = temp_frame
-        temp_frame.destroy()
+        for result_frame in self.displayed_results:
+            result_frame.destroy()
+        self.displayed_results.clear()
 
     def update_results_count(self, count):
         if self.results_count_label:
             self.results_count_label.destroy()
 
         message = f"About {count} results"
-        self.results_count_label = tk.Label(
-            self.results_frame, text=message, font=("Arial", 9), bg="#ffffff", fg="grey"
+        self.results_count_label = customtkinter.CTkLabel(
+            self.results_frame,
+            text=message,
+            font=("Helvetica", 11),
         )
         self.results_count_label.grid(sticky="w", padx=150, pady=(5, 0))

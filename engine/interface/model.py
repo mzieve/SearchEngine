@@ -15,6 +15,7 @@ from engine.text import (
 from engine.indexing import Index, PositionalInvertedIndex
 from engine.querying import BooleanQueryParser
 from tkinter import filedialog, Label, ttk
+import customtkinter # type: ignore
 from pathlib import Path
 from io import StringIO, TextIOWrapper
 from .decorators import threaded, threaded_value
@@ -76,7 +77,6 @@ class SearchManager:
         self.canvas = canvas
         self.preprocess = preprocess
 
-    @threaded
     def perform_search(self):
         if not self._corpus_ready():
             return
@@ -84,7 +84,7 @@ class SearchManager:
         raw_query = self._get_raw_query()
 
         if not raw_query:
-            self.home_warning_label.config(text="Please enter a search query.")
+            self.home_warning_label.configure(text="Please enter a search query.")
             return
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
@@ -106,7 +106,7 @@ class SearchManager:
 
     def _corpus_ready(self):
         if not self.corpus_manager.corpus:
-            self.home_warning_label.config(text="Please load a corpus first.")
+            self.home_warning_label.configure(text="Please load a corpus first.")
             return False
         return True
 
@@ -122,7 +122,7 @@ class SearchManager:
 
     def _get_postings(self, query):
         if not query:
-            self.home_warning_label.config(
+            self.home_warning_label.configure(
                 text="Invalid Query. Please enter a valid search query."
             )
             return []
@@ -134,26 +134,14 @@ class SearchManager:
         results = len(postings)
         self.view.pages["ResultsPage"].update_results_count(results)
 
-        self.canvas.configure(scrollregion=(0, 0, 0, 0))
-
-        counter = 0
-        result_counter = 10
-
         for posting in postings:
             doc = next(
                 (d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None
             )
             if doc:
                 self.view.pages["ResultsPage"].add_search_result_to_window(
-                    doc.id, doc.title, None
+                    doc.id, doc.title
                 )
-
-            counter += 1
-            if counter % result_counter == 0:
-                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-                self.canvas.update_idletasks()
-
-        self.canvas.yview_moveto(0)
 
     def _handle_search_error(self, exception):
         self.view.pages["ResultsPage"].display_no_results_warning(str(exception))
@@ -182,20 +170,17 @@ class UIManager:
         # Calculate number of documents
         self.total_documents = sum(1 for _ in self.corpus_manager.corpus)
 
-        self.progress = ttk.Progressbar(
+        self.progress = customtkinter.CTkProgressBar(
             self.view.pages["HomePage"].centered_frame,
-            orient="horizontal",
-            length=300,
             mode="determinate",
-            maximum=self.total_documents,
+            width=500,
+            height=10,
         )
 
-        self.progress_info_label = Label(
+        self.progress_info_label = customtkinter.CTkLabel(
             self.view.pages["HomePage"].centered_frame,
             text="Progress: 0%",
-            bg="#ffffff",
-            fg="#000000",
-            font=("Arial", 10),
+            font=("Arial", 14),
         )
 
         self.progress.grid(row=3, column=0, columnspan=3, pady=0, padx=50)
@@ -210,9 +195,11 @@ class UIManager:
 
     def update_progress_ui(self, current_document_index):
         """Update the progress UI based on the indexed documents."""
-        percentage_complete = (current_document_index / self.total_documents) * 100
-        self.progress["value"] = current_document_index
-        self.progress_info_label.config(text=f"Progress: {percentage_complete:.1f}%")
+        progress_fraction = current_document_index / self.total_documents
+        percentage_complete = progress_fraction * 100
+
+        self.progress.set(progress_fraction)
+        self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
         self.view.master.update_idletasks()
 
     def perform_search_ui(self):

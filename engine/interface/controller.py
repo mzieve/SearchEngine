@@ -47,7 +47,7 @@ class SearchController:
         self.search_manager.results_search_entry = self.view.pages[
             "ResultsPage"
         ].results_search_entry
-        self.search_manager.canvas = self.view.pages["ResultsPage"].canvas
+        self.search_manager.results_frame = self.view.pages["ResultsPage"].results_frame
 
         # Update the UIManager's view reference
         self.ui_manager.view = self.view

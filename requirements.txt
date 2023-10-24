@@ -7,3 +7,5 @@ lxml==4.9.3
 mypy==1.6.1
 black==23.10.0
 lxml-stubs==0.4.0
+customtkinter==5.2.1
+Pillow==10.1.0
