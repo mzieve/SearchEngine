@@ -1,7 +1,10 @@
 from tkinter import filedialog, Label, ttk
 import tkinter.font as font
-from PIL import Image
+from PIL import Image, ImageSequence
 import customtkinter # type: ignore
+from customtkinter import CTkScrollableFrame
+from itertools import cycle
+import tkinter as tk
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
@@ -33,6 +36,7 @@ class SearchView:
         self.container.grid(row=0, column=0, sticky="nsew")
         self.master.rowconfigure(0, weight=1)
         self.master.columnconfigure(0, weight=1)
+        self.master.minsize(1000, 800)
 
         self.container.rowconfigure(0, weight=1)
         self.container.columnconfigure(0, weight=1)
@@ -74,16 +78,21 @@ class HomePage(customtkinter.CTkFrame):
         customtkinter.CTkFrame.__init__(self, parent)
         self.controller = controller
 
-        self.centered_frame = customtkinter.CTkFrame(self)
-        self.centered_frame.grid(row=0, column=0, sticky="nsew")
-
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
+
+        self.centered_frame = customtkinter.CTkFrame(self, bg_color="#2b2b2b")
+        self.centered_frame.grid(row=0, column=0, sticky="nsew")
+        self.centered_frame.configure(width=400, height=400)
+
+
         self.centered_frame.columnconfigure(0, weight=1)
         self.centered_frame.rowconfigure(0, weight=1)
-        self.centered_frame.rowconfigure(1, weight=1)
-        self.centered_frame.rowconfigure(2, weight=1)
-        self.centered_frame.rowconfigure(3, weight=1)
+        self.centered_frame.rowconfigure(1, weight=0, minsize=100)
+        self.centered_frame.rowconfigure(2, weight=0, minsize=100)
+        self.centered_frame.rowconfigure(3, weight=0, minsize=100)
+        self.centered_frame.rowconfigure(4, weight=0, minsize=100)
+        self.centered_frame.rowconfigure(5, weight=1)
 
         self._add_home_logo()
         self._add_home_search_entry()
@@ -94,20 +103,20 @@ class HomePage(customtkinter.CTkFrame):
         logo_label = customtkinter.CTkLabel(
             self.centered_frame,
             text="Querlo",
-            font=("Arial", 62),
+            font=("Arial", 68),
             fg_color="#7236bf",
             padx=10,
             pady=10,
             text_color="white",
         )
-        logo_label.grid(row=0, column=0, pady=(0, 5), padx=100, columnspan=3)
+        logo_label.grid(row=1, column=0, pady=(0, 15), padx=100, columnspan=3)
 
     def _add_home_search_entry(self, query=""):
         """Add the search entry box to the GUI."""
         self.search_entry = customtkinter.CTkEntry(
-            self.centered_frame, width=500, corner_radius=30
+            self.centered_frame, width=500, corner_radius=20, fg_color="#2b2b2b"
         )
-        self.search_entry.grid(row=1, column=0, columnspan=3, ipady=8, pady=5)
+        self.search_entry.grid(row=2, column=0, columnspan=3, ipady=8, pady=(0, 15))
         self.search_entry.insert(0, query)
         self.search_entry.bind(
             "<Return>",
@@ -117,9 +126,9 @@ class HomePage(customtkinter.CTkFrame):
     def _add_search_button(self):
         """Add the search button to the GUI."""
         button_frame = customtkinter.CTkFrame(
-            self.centered_frame, fg_color="transparent", width=100
+            self.centered_frame, fg_color="transparent"
         )
-        button_frame.grid(row=2, column=0, columnspan=3, pady=5)
+        button_frame.grid(row=3, column=0, columnspan=3)
 
         search_btn = customtkinter.CTkButton(
             button_frame,
@@ -128,7 +137,7 @@ class HomePage(customtkinter.CTkFrame):
             height=40,
             width=120,
             font=("Arial", 14),
-            fg_color="#4a4a4a",
+            fg_color="#666666",
             hover_color="#636363",
         )
         search_btn.grid(row=0, column=0, padx=10)
@@ -140,15 +149,15 @@ class HomePage(customtkinter.CTkFrame):
             height=40,
             width=120,
             font=("Arial", 14),
-            fg_color="#4a4a4a",
+            fg_color="#666666",
             hover_color="#636363",
         )
         load_corpus_btn.grid(row=0, column=1, padx=10)
 
         self.home_warning_label = customtkinter.CTkLabel(
-            button_frame, text="", font=("Arial", 10)
+            button_frame, text="", font=("Arial", 14)
         )
-        self.home_warning_label.grid(row=1, columnspan=2, pady=10)
+        self.home_warning_label.grid(row=1, columnspan=2, pady=(20, 0))
 
 
 class ResultsPage(customtkinter.CTkFrame):
@@ -156,6 +165,7 @@ class ResultsPage(customtkinter.CTkFrame):
         customtkinter.CTkFrame.__init__(self, parent)
         self.controller = controller
         self.displayed_results = []
+        self.results_count_label = None
 
         self.top_frame = customtkinter.CTkFrame(self)
         self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
@@ -174,7 +184,7 @@ class ResultsPage(customtkinter.CTkFrame):
         self.results_search_entry = None
 
         # Add result frame to canvas
-        self.results_frame = customtkinter.CTkScrollableFrame(self)
+        self.results_frame = LazyLoading(self, [])
         self.results_frame.grid(
             row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
         )
@@ -184,10 +194,6 @@ class ResultsPage(customtkinter.CTkFrame):
 
     def show_results_page(self, query):
         """Show the Logo and Entry for Results"""
-        self._add_results_logo()
-        self._add_results_search_entry(query)
-
-    def _add_results_logo(self):
         logo_label = customtkinter.CTkLabel(
             self.top_frame,
             text="Querlo",
@@ -197,50 +203,125 @@ class ResultsPage(customtkinter.CTkFrame):
             pady=10,
             text_color="white",
         )
+
+        if not self.results_search_entry:
+            self.results_search_entry = customtkinter.CTkEntry(
+                self.top_frame, width=600, height=40, corner_radius=25, fg_color="#2b2b2b"
+            )
+            self.results_search_entry.grid(row=0, column=1, sticky="w")
+
+            self.results_search_entry.bind(
+                "<Return>",
+                lambda event=None: self.controller.ui_manager.perform_search_ui(),
+            )
+        else:
+            self.results_search_entry.delete(0, 'end') 
+
+        self.results_search_entry.insert(0, query)
         logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
 
-    def _add_results_search_entry(self, query):
-        self.results_search_entry = customtkinter.CTkEntry(
-            self.top_frame, width=500, corner_radius=25
-        )
-        self.results_search_entry.grid(row=0, column=1, sticky="w")
-        self.results_search_entry.insert(0, query)
-        self.results_search_entry.bind(
-            "<Return>",
-            lambda event=None: self.controller.ui_manager.perform_search_ui(),
-        )
-
-    def display_no_results_warning(self, error_message=None):
+    def display_no_results_warning(self, query, error_message=None):
         """Display the no results message inside the results frame."""
         result_frame = customtkinter.CTkFrame(self.results_frame)
-        result_frame.grid(sticky="ew", padx=150)
-
-        # Load the image
-        self.image = customtkinter.CTkImage(dark_image=Image.open("./img/pow.png"))
-        image_label = customtkinter.CTkLabel(result_frame, image=self.image, text="")
-        image_label.grid(row=1, column=0, sticky="w", padx=10, pady=5)
-
-        message = "Your search did not match any Documents \n\nSuggestions: \n\n\u2022Make sure all keywords are spelled correctly. \n\u2022Try different keywords \n\u2022Try more general keywords."
-
+        animated_gif = AnimatedGIF(result_frame, path="./img/marvel.gif", size=(150, 150))
+        message = f"Your search - {query} - did not match any Documents \n\nSuggestions: \n\n\u2022 Make sure all keywords are spelled correctly.\n\u2022 Try different keywords\n\u2022 Try more general keywords."
         if error_message:
             message += f"\n\nError: {error_message}"
 
-        customtkinter.CTkLabel(
+        result_label = customtkinter.CTkLabel(
+            result_frame,
+            text="About 0 results",
+            font=("Helvetica", 11),
+        )
+
+        message_label = customtkinter.CTkLabel(
             result_frame,
             text=message,
-            font=("Arial", 10),
-            anchor="w",
-        ).grid(row=0, column=0, sticky="w", pady=5)
+            font=("Helvetica", 14),
+            justify="left"
+        )
+        
+        self.update_idletasks()
+
+        result_frame.grid(row=1, column=0, columnspan=2)
+        result_label.grid(row=0, column=0, sticky="w", padx=150, pady=(5, 0))
+        message_label.grid(row=1, column=0, pady=5, padx=150)
 
         self.displayed_results.append(result_frame)
 
-    def add_search_result_to_window(self, doc_id, doc_title):
-        """Display the Results"""
-        result_frame = customtkinter.CTkFrame(self.results_frame)
-        result_frame.grid(
-            sticky="ew",
-            padx=150,
+    def clear_results(self):
+        """Clear all displayed search results and reset Canvas's scroll region."""
+        self.results_frame.destroy()
+
+        self.results_frame = LazyLoading(self, [])
+        self.results_frame.grid(
+            row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
         )
+
+class LazyLoading(customtkinter.CTkScrollableFrame):
+    def __init__(self, master, data_items, chunk_size=15, *args, **kwargs):
+        """Initializes the LazyLoading frame with data items and settings."""
+        super().__init__(master, *args, **kwargs)
+        
+        self.data_items = data_items
+        self.chunk_size = chunk_size
+        self.last_loaded_index = -1  
+
+        self.load_initial_widgets()
+        self.periodic_check_scroll()
+
+    def update_results_count(self, count):
+        """Updates the results count label with the given count."""
+        if hasattr(self, 'results_count_label') and self.results_count_label:
+            self.results_count_label.destroy()
+
+        message = f"About {count} results"
+        self.results_count_label = customtkinter.CTkLabel(
+            self,
+            text=message,
+            font=("Helvetica", 11),
+        )
+        
+        self.results_count_label.grid(row=0, column=0, sticky="w", padx=150, pady=(5, 0))
+
+    def load_initial_widgets(self):
+        """Loads the initial set of widgets based on the chunk size."""
+        end = min(self.chunk_size, len(self.data_items))
+        self.load_new_widgets(0, end)
+
+    def periodic_check_scroll(self):
+        """Periodically checks the scroll position to load more items if needed."""
+        yview = self._parent_canvas.yview()
+        if yview[1] >= 0.95:  
+            self.load_next_chunk()
+
+        self.after(100, self.periodic_check_scroll)
+
+    def load_next_chunk(self):
+        """Loads the next chunk of data items as widgets."""
+        start = self.last_loaded_index + 1
+        end = start + self.chunk_size
+        self.load_new_widgets(start, end)
+
+    def load_new_widgets(self, start, end):
+        """Loads widgets for data items in the given range (start to end)."""
+        for i in range(start, end):
+            if i < len(self.data_items):
+                widget = self.create_widget_from_data(self.data_items[i])
+                widget.grid(row=i+1, column=0, sticky="nsew")  
+        
+        self.last_loaded_index = end - 1
+
+    def create_widget_from_data(self, data):
+        """Creates a widget for a given data item and returns it."""
+        parts = data.split(" - ")
+        doc_id_str = parts[0].replace("Document ID# ", "")
+        doc_title = parts[1]
+
+        doc_id = int(doc_id_str) 
+        
+        result_frame = customtkinter.CTkFrame(self)
+        result_frame.grid(sticky="ew", padx=150)
 
         customtkinter.CTkLabel(
             result_frame,
@@ -252,22 +333,19 @@ class ResultsPage(customtkinter.CTkFrame):
             result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
         ).grid(row=1, column=0, sticky="w", pady=(0, 25))
 
-        self.displayed_results.append(result_frame)
+        return result_frame
 
-    def clear_results(self):
-        """Clear all displayed search results and reset Canvas's scroll region."""
-        for result_frame in self.displayed_results:
-            result_frame.destroy()
-        self.displayed_results.clear()
+class AnimatedGIF:
+    def __init__(self, master, path, size):
+        self.frames = [frame.copy() for frame in ImageSequence.Iterator(Image.open(path))]
+        self.frames_cycle = cycle(self.frames)
+        self.current_image = customtkinter.CTkImage(light_image=next(self.frames_cycle), size=size)
+        self.image_label = customtkinter.CTkLabel(master, image=self.current_image, text="")
+        self.image_label.grid(row=2, column=0, sticky="w", padx=150, pady=(25,0))
+        self._animate()
 
-    def update_results_count(self, count):
-        if self.results_count_label:
-            self.results_count_label.destroy()
-
-        message = f"About {count} results"
-        self.results_count_label = customtkinter.CTkLabel(
-            self.results_frame,
-            text=message,
-            font=("Helvetica", 11),
-        )
-        self.results_count_label.grid(sticky="w", padx=150, pady=(5, 0))
+    def _animate(self):
+        next_image = customtkinter.CTkImage(light_image=next(self.frames_cycle), size=(175, 175))
+        self.image_label.configure(image=next_image)
+        self.image_label.image = next_image  
+        self.image_label.after(15, self._animate)
