@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Iterable
 from .document import Document
 
+
 class JsonDocument(Document):
     def __init__(self, id: int, title: str, content: str):
         """Initialize a JsonDocument instance."""
@@ -19,6 +20,6 @@ class JsonDocument(Document):
         yield self._content
 
     @staticmethod
-    def load_from(doc_id: int, title: str, content: str) -> 'JsonDocument':
+    def load_from(doc_id: int, title: str, content: str) -> "JsonDocument":
         """Static method to load a JsonDocument."""
         return JsonDocument(doc_id, title, content)

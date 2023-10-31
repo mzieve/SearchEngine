@@ -2,6 +2,7 @@ from typing import Iterable
 from .postings import Posting
 from .index import Index
 
+
 class PositionalInvertedIndex(Index):
     """Implements a positional inverted index."""
 
@@ -17,14 +18,14 @@ class PositionalInvertedIndex(Index):
 
         return postings
 
-    def getVocabulary(self) -> Iterable[str]:
-        vocab = sorted(self.index.keys())
-        return vocab
+    def getVocabulary(self) -> list[str]:
+        """Return the vocabulary of the poistional inverted index"""
+        return sorted(self.index.keys())
 
-    def addTerm(self, term: str, doc_id: int, position : int):
+    def addTerm(self, term: str, doc_id: int, position: int):
         """Records that the given document ID contains the given term at its current position."""
         if term not in self.index:
-           self.index[term] = [Posting(doc_id, position)]
+            self.index[term] = [Posting(doc_id, position)]
         else:
             latest_posting = self.index[term][-1]
             if latest_posting.doc_id < doc_id:

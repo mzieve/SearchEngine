@@ -1,6 +1,7 @@
 from .tokenprocessor import TokenProcessor
 import spacy
 
+
 class SpanishTokenProcessor(TokenProcessor):
     def __init__(self):
         self.nlp = spacy.load("es_core_news_sm")
@@ -12,7 +13,7 @@ class SpanishTokenProcessor(TokenProcessor):
 
         for tok in doc:
             if tok.is_alpha:
-                alpha_text = ''.join(filter(str.isalnum, tok.text.lower()))
+                alpha_text = "".join(filter(str.isalnum, tok.text.lower()))
                 if alpha_text:
                     processed_tokens.append(alpha_text)
 

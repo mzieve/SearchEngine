@@ -1,6 +1,7 @@
 from engine.indexing.postionalinvertedindex import PositionalInvertedIndex
 import pytest
 
+
 @pytest.fixture
 def positional_index():
     index = PositionalInvertedIndex()
@@ -8,6 +9,7 @@ def positional_index():
     index.addTerm("cat", 1, 2)
     index.addTerm("dog", 2, 1)
     return index
+
 
 def test_get_postings_found(positional_index):
     postings = positional_index.getPostings("cat")
@@ -19,6 +21,7 @@ def test_get_postings_found(positional_index):
 def test_get_postings_not_found(positional_index):
     postings = positional_index.getPostings("elephant")
     assert len(postings) == 0
+
 
 def test_get_vocabulary(positional_index):
     vocab = positional_index.getVocabulary()

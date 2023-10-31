@@ -2,5 +2,10 @@ pytest==7.4.2
 nltk==3.8.1
 stemming==1.0.1
 spacy==3.7.1
-langdetect=1.0.9
-lxml=4.9.3
+langdetect==1.0.9
+lxml==4.9.3
+mypy==1.6.1
+black==23.10.0
+lxml-stubs==0.4.0
+customtkinter==5.2.1
+Pillow==10.1.0

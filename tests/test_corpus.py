@@ -1,4 +1,9 @@
-from engine.documents import DocumentCorpus, DirectoryCorpus, JsonDocument, TextFileDocument
+from engine.documents import (
+    DocumentCorpus,
+    DirectoryCorpus,
+    JsonDocument,
+    TextFileDocument,
+)
 from pathlib import Path
 import pytest
 import tempfile
@@ -7,13 +12,16 @@ import json
 
 json_content = {"title": "test", "body": "This is a test json document."}
 
+
 # Test for JsonDocument
 def test_jsondocument():
     doc = JsonDocument(0, json_content["title"], json_content["body"])
     assert doc.title == "test"
     assert next(doc.get_content()) == "This is a test json document."
 
+
 text_content = "This is a test text document."
+
 
 # Test for TextFileDocument
 def test_textfiledocument():
@@ -25,6 +33,7 @@ def test_textfiledocument():
         assert next(iter(doc.get_content())).strip() == text_content
         os.unlink(tmp.name)
 
+
 # Test for DirectoryCorpus
 def test_directorycorpus():
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -33,7 +42,7 @@ def test_directorycorpus():
 
         with open(json_path, "w") as f:
             json.dump(json_content, f)
-        
+
         with open(text_path, "w") as f:
             f.write(text_content)
 
