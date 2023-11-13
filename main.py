@@ -6,6 +6,6 @@ if __name__ == "__main__":
     customtkinter.set_appearance_mode("dark")
     root = customtkinter.CTk()
     root.title("Querlo")
-    root.iconbitmap("img/logo.ico")
+    #root.iconphoto(False, customtkinter.PhotoImage(file="img/logo.png"))
     app = SearchController(root)
     root.mainloop()
