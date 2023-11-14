@@ -12,7 +12,10 @@ class DiskIndexWriter:
                             (term TEXT,
                             postings_start INTEGER)
                             """)
-
+        self.cursor.execute(f"""
+                            DELETE FROM beginnings
+                            """)
+        self.conn.commit()
     def writeIndex(self, p_i_index, on_disk_index_path):
         """
         Writing the on-disk index.

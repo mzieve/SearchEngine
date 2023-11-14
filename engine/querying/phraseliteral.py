@@ -16,7 +16,7 @@ class PhraseLiteral(QueryComponent):
             return []
 
         postings_lists = [
-            literal.getPostings(index)
+            literal.getPostings(index, True)
             for literal in self.literals
             if isinstance(literal, QueryComponent)
         ]

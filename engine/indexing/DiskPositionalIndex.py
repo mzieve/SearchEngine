@@ -25,8 +25,7 @@ class DiskPositionalIndex(Index):
         postings_file = open(postings_file_path, "rb")
         postings_file.seek(postings_start)
         return postings_file
-    def getPostings(self, term: str) -> Iterable[Posting]:
-        #Optional arg: need_pos: bool
+    def getPostings(self, term: str, need_pos: bool) -> Iterable[Posting]:
         """Returns a list of Postings for all documents that contain the given term."""
         postings_file = self.goto_term(term)
         """
@@ -38,7 +37,6 @@ class DiskPositionalIndex(Index):
             Only read positions when need_pos argument is True, otherwise, skip over them.
         """
         #Placeholder for need_pos arg while I figure out how to use it for phrase queries...
-        need_pos = True
         if need_pos:
             return self.getPostingsWithPositions(term, postings_file)
         else:
@@ -78,8 +76,7 @@ class DiskPositionalIndex(Index):
             doc_id = prev_doc_id + doc_id_gap
             packed_tftd = postings_file.read(4)
             tftd = struct.unpack("i", packed_tftd)[0]
-            for postn in range(tftd):
-                postings_file.seek(4, 1)
+            postings_file.seek(4 * tftd, 1)
             posting = Posting(doc_id, -1)
             postings.append(posting)
         return postings

@@ -33,7 +33,8 @@ class Preprocessing:
         """Position each document based on the detected language"""
         eng_processor = BasicTokenProcessor()
         es_processor = SpanishTokenProcessor()
-
+        doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
+        doc_Weights_file = open(doc_Weights_file_path, "wb")
         #Does this loop go through the docs in Doc ID order?
         for i, doc_path in enumerate(corpus):
             #For each doc:
@@ -62,15 +63,12 @@ class Preprocessing:
             for term, freq in tftd.items():
                 tftd_sq_sum += freq ** 2
             euc_len = float(sqrt(tftd_sq_sum))
-            packed_euc_len = struct.pack("i", euc_len)
-            doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
-            doc_Weights_file = open(doc_Weights_file_path, "wb")
+            packed_euc_len = struct.pack("f", euc_len)
             doc_Weights_file.write(packed_euc_len)
-            doc_Weights_file.close()
             # After processing each document, update the progress.
             if progress_callback:
                 progress_callback(i + 1)
-
+        doc_Weights_file.close()
         #get the current working directory
         #cwd = os.getcwd()
 

@@ -10,7 +10,7 @@ class NotQuery(QueryComponent):
         return False
 
     def getPostings(self, index) -> list[Posting]:
-        return self.component.getPostings(index)
+        return self.component.getPostings(index, False)
 
     def __str__(self):
         return f"NOT ({str(self.component)})"

@@ -12,7 +12,7 @@ class OrQuery(QueryComponent):
         postings = []
 
         for component in self.components:
-            for posting in component.getPostings(index):
+            for posting in component.getPostings(index, False):
                 if posting.doc_id not in document_ids:
                     postings.append(posting)
                     document_ids.add(posting.doc_id)

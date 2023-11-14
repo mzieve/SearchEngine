@@ -12,10 +12,10 @@ class AndQuery(QueryComponent):
         # result = []
         # TODO: program the merge for an AndQuery, by gathering the postings of the composed QueryComponents and
         # intersecting the resulting postings.
-        result = self.components[0].getPostings(index)
+        result = self.components[0].getPostings(index, False)
         for component in self.components[1:]:
             not_component = not component.is_positive()
-            new_postings = component.getPostings(index)
+            new_postings = component.getPostings(index, False)
             result = self._and_op(result, new_postings, not_component)
         return result
 
