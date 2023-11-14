@@ -126,7 +126,7 @@ class SearchManager:
             )
             return []
 
-        postings = query.getPostings(self.preprocess.p_i_index)
+        postings = query.getPostings(self.preprocess.d_i_index)
         return postings
 
     def _display_search_results(self, postings):

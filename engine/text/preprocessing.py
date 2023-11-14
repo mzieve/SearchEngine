@@ -4,17 +4,20 @@ from engine.text import (
     EnglishTokenStream,
     SpanishTokenStream,
 )
-from engine.indexing import Index, PositionalInvertedIndex
+from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
 from langdetect import detect  # type: ignore
 import config
 import spacy
-
+import os
 
 class Preprocessing:
     def __init__(self, text=None):
         self.text = text
         self.p_i_index = PositionalInvertedIndex()
         self.nlp = spacy.load("es_core_news_sm")
+        self.on_disk_index_path = r"C:\Users\seanl\OneDrive\Documents\University_Documents\Our_Best_Search_Engine\SearchEngine\data"
+        self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
+        self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
 
     def detect_language(self, text):
         """Detects the language of the provided text."""
@@ -48,6 +51,12 @@ class Preprocessing:
             if progress_callback:
                 progress_callback(i + 1)
 
+        #get the current working directory
+        #cwd = os.getcwd()
+
+        #The positional inverted index has all the info we need. Write it to disk.
+        self.d_i_writer.writeIndex(self.p_i_index, self.on_disk_index_path)
+        # on_disk_index_path = "C:\Users\seanl\OneDrive\Documents\University_Documents\Our_Best_Search_Engine\SearchEngine\data"
         return self.p_i_index.getVocabulary()
 
     def process(self, query):
