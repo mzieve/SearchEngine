@@ -1,3 +1,5 @@
+import struct
+
 from engine.text import (
     BasicTokenProcessor,
     SpanishTokenProcessor,
@@ -6,15 +8,18 @@ from engine.text import (
 )
 from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
 from langdetect import detect  # type: ignore
+from math import sqrt
 import config
 import spacy
 import os
+
 
 class Preprocessing:
     def __init__(self, text=None):
         self.text = text
         self.p_i_index = PositionalInvertedIndex()
         self.nlp = spacy.load("es_core_news_sm")
+        #Find a way to make this path relative.
         self.on_disk_index_path = r"C:\Users\seanl\OneDrive\Documents\University_Documents\Our_Best_Search_Engine\SearchEngine\data"
         self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
         self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
@@ -29,7 +34,9 @@ class Preprocessing:
         eng_processor = BasicTokenProcessor()
         es_processor = SpanishTokenProcessor()
 
+        #Does this loop go through the docs in Doc ID order?
         for i, doc_path in enumerate(corpus):
+            #For each doc:
             if config.LANGUAGE == "english":
                 tokens = EnglishTokenStream(doc_path.get_content())
                 processor = eng_processor
@@ -38,7 +45,8 @@ class Preprocessing:
                 processor = es_processor
 
             position = 0
-
+            #Record tftd values for each term in this document.
+            tftd = dict()
             for token in tokens:
                 position += 1
                 tok_types = processor.process_token(token)
@@ -46,7 +54,19 @@ class Preprocessing:
                 for tok_type in tok_types:
                     term = processor.normalize_type(tok_type)
                     self.p_i_index.addTerm(term, doc_path.id, position)
-
+                    if term not in tftd:
+                        tftd[term] = 1
+                    else:
+                        tftd[term] += 1
+            tftd_sq_sum = 0
+            for term, freq in tftd.items():
+                tftd_sq_sum += freq ** 2
+            euc_len = float(sqrt(tftd_sq_sum))
+            packed_euc_len = struct.pack("i", euc_len)
+            doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
+            doc_Weights_file = open(doc_Weights_file_path, "wb")
+            doc_Weights_file.write(packed_euc_len)
+            doc_Weights_file.close()
             # After processing each document, update the progress.
             if progress_callback:
                 progress_callback(i + 1)

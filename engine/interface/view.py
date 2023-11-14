@@ -223,7 +223,7 @@ class ResultsPage(customtkinter.CTkFrame):
     def display_no_results_warning(self, query, error_message=None):
         """Display the no results message inside the results frame."""
         result_frame = customtkinter.CTkFrame(self.results_frame)
-        animated_gif = AnimatedGIF(result_frame, path="./img/marvel.gif", size=(150, 150))
+        animated_gif = AnimatedGIF(result_frame, path="../../img/marvel.gif", size=(150, 150))
         message = f"Your search - {query} - did not match any Documents \n\nSuggestions: \n\n\u2022 Make sure all keywords are spelled correctly.\n\u2022 Try different keywords\n\u2022 Try more general keywords."
         if error_message:
             message += f"\n\nError: {error_message}"
