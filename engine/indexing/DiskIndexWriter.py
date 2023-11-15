@@ -21,7 +21,7 @@ class DiskIndexWriter:
         Writing the on-disk index.
         """
         # Creating / opening a file in binary mode in the specified path to write the postings of the on-disk index.
-        postings_file_path = on_disk_index_path + "\postings.bin"
+        postings_file_path = os.path.join(on_disk_index_path, "postings.bin")
         postings_file = open(postings_file_path, "wb")
         vocab = p_i_index.getVocabulary()
         for term in vocab:

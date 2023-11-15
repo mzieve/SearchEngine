@@ -19,8 +19,9 @@ class Preprocessing:
         self.text = text
         self.p_i_index = PositionalInvertedIndex()
         self.nlp = spacy.load("es_core_news_sm")
-        #Find a way to make this path relative.
-        self.on_disk_index_path = r"C:\Users\seanl\OneDrive\Documents\University_Documents\Our_Best_Search_Engine\SearchEngine\data"
+        #Used a relative path so that this file and project can work on any computer.
+        proj_path = os.path.abspath(".")
+        self.on_disk_index_path = os.path.join(proj_path, "SearchEngine\data")
         self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
         self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
 
