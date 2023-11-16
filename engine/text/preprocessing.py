@@ -22,8 +22,8 @@ class Preprocessing:
         #Used a relative path so that this file and project can work on any computer.
         proj_path = os.path.abspath(".")
         self.on_disk_index_path = os.path.join(proj_path, "SearchEngine\data")
-        self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
-        self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
+        #self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
+        #self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
 
     def detect_language(self, text):
         """Detects the language of the provided text."""
@@ -34,49 +34,62 @@ class Preprocessing:
         """Position each document based on the detected language"""
         eng_processor = BasicTokenProcessor()
         es_processor = SpanishTokenProcessor()
-        doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
-        doc_Weights_file = open(doc_Weights_file_path, "wb")
-        #Does this loop go through the docs in Doc ID order?
-        for i, doc_path in enumerate(corpus):
-            #For each doc:
-            if config.LANGUAGE == "english":
-                tokens = EnglishTokenStream(doc_path.get_content())
-                processor = eng_processor
-            elif config.LANGUAGE == "spanish":
-                tokens = SpanishTokenStream(doc_path.get_content(), nlp=self.nlp)
-                processor = es_processor
+        data_folder_name = corpus.corpus_path.split("/")[-1]
+        data_folder_path = os.path.join(self.on_disk_index_path, data_folder_name)
+        try:
+            os.makedirs(data_folder_path)
+            self.on_disk_index_path = data_folder_path
+            self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
+            self.d_i_index = DiskPositionalIndex(self.on_disk_index_path)
+            doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
+            doc_Weights_file = open(doc_Weights_file_path, "wb")
+            # Does this loop go through the docs in Doc ID order?
+            for i, doc_path in enumerate(corpus):
+                # For each doc:
+                if config.LANGUAGE == "english":
+                    tokens = EnglishTokenStream(doc_path.get_content())
+                    processor = eng_processor
+                elif config.LANGUAGE == "spanish":
+                    tokens = SpanishTokenStream(doc_path.get_content(), nlp=self.nlp)
+                    processor = es_processor
 
-            position = 0
-            #Record tftd values for each term in this document.
-            tftd = dict()
-            for token in tokens:
-                position += 1
-                tok_types = processor.process_token(token)
+                position = 0
+                # Record tftd values for each term in this document.
+                tftd = dict()
+                for token in tokens:
+                    position += 1
+                    tok_types = processor.process_token(token)
 
-                for tok_type in tok_types:
-                    term = processor.normalize_type(tok_type)
-                    self.p_i_index.addTerm(term, doc_path.id, position)
-                    if term not in tftd:
-                        tftd[term] = 1
-                    else:
-                        tftd[term] += 1
-            tftd_sq_sum = 0
-            for term, freq in tftd.items():
-                tftd_sq_sum += freq ** 2
-            euc_len = float(sqrt(tftd_sq_sum))
-            packed_euc_len = struct.pack("f", euc_len)
-            doc_Weights_file.write(packed_euc_len)
-            # After processing each document, update the progress.
-            if progress_callback:
-                progress_callback(i + 1)
-        doc_Weights_file.close()
-        #get the current working directory
-        #cwd = os.getcwd()
+                    for tok_type in tok_types:
+                        term = processor.normalize_type(tok_type)
+                        self.p_i_index.addTerm(term, doc_path.id, position)
+                        if term not in tftd:
+                            tftd[term] = 1
+                        else:
+                            tftd[term] += 1
+                tftd_sq_sum = 0
+                for term, freq in tftd.items():
+                    tftd_sq_sum += freq ** 2
+                euc_len = float(sqrt(tftd_sq_sum))
+                packed_euc_len = struct.pack("f", euc_len)
+                doc_Weights_file.write(packed_euc_len)
+                # After processing each document, update the progress.
+                if progress_callback:
+                    progress_callback(i + 1)
+            doc_Weights_file.close()
+            # get the current working directory
+            # cwd = os.getcwd()
 
-        #The positional inverted index has all the info we need. Write it to disk.
-        self.d_i_writer.writeIndex(self.p_i_index, self.on_disk_index_path)
-        # on_disk_index_path = "C:\Users\seanl\OneDrive\Documents\University_Documents\Our_Best_Search_Engine\SearchEngine\data"
-        return self.p_i_index.getVocabulary()
+            # The positional inverted index has all the info we need. Write it to disk.
+            self.d_i_writer.writeIndex(self.p_i_index, self.on_disk_index_path)
+        except OSError as error:
+            #Index folder with data already exists, so skip indexing altogether.
+            #Positional Index has all the terms as well, so just return its vocabulary.
+            self.on_disk_index_path = data_folder_path
+            self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
+            self.d_i_index = DiskPositionalIndex(self.on_disk_index_path)
+        finally:
+            return self.p_i_index.getVocabulary()
 
     def process(self, query):
         """Processes the text based on its detected language."""

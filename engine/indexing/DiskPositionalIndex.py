@@ -8,10 +8,10 @@ import os
 class DiskPositionalIndex(Index):
     """Implements a positional inverted index on disk."""
 
-    def __init__(self, postings_path, db_file_path):
+    def __init__(self, postings_db_files_path):
         """Constructs an empty index"""
-        self.postings_path = postings_path
-        db_file_name = os.path.join(db_file_path, "postings_start.db")
+        self.postings_path = postings_db_files_path
+        db_file_name = os.path.join(postings_db_files_path, "postings_start.db")
         conn = sqlite3.connect(db_file_name)
         self.cursor = conn.cursor()
 
@@ -21,7 +21,7 @@ class DiskPositionalIndex(Index):
         self.cursor.execute(sql)
         postings_start = self.cursor.fetchone()[0]
         # 2. Using your already-opened postings.bin file, seek to the position of the term.
-        postings_file_path = self.postings_path + "\postings.bin"
+        postings_file_path = os.path.join(self.postings_path, "postings.bin")
         postings_file = open(postings_file_path, "rb")
         postings_file.seek(postings_start)
         return postings_file
@@ -36,7 +36,6 @@ class DiskPositionalIndex(Index):
             
             Only read positions when need_pos argument is True, otherwise, skip over them.
         """
-        #Placeholder for need_pos arg while I figure out how to use it for phrase queries...
         if need_pos:
             return self.getPostingsWithPositions(term, postings_file)
         else:
