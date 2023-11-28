@@ -1,19 +1,6 @@
-from engine.documents import (
-    DocumentCorpus,
-    DirectoryCorpus,
-    TextFileDocument,
-    JsonDocument,
-    XMLDocument,
-)
-from engine.text import (
-    BasicTokenProcessor,
-    SpanishTokenProcessor,
-    EnglishTokenStream,
-    SpanishTokenStream,
-    Preprocessing,
-)
-from engine.indexing import Index, PositionalInvertedIndex
-from engine.querying import BooleanQueryParser
+from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
+from config import DB_PATH, POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, DATA_DIR
+from engine.querying import BooleanQueryParser, PhraseLiteral
 from tkinter import filedialog, Label, ttk
 import customtkinter # type: ignore
 from pathlib import Path
@@ -26,6 +13,23 @@ import queue
 import io
 import builtins
 import config
+import os
+import json
+import sqlite3
+from engine.text import (
+    BasicTokenProcessor,
+    SpanishTokenProcessor,
+    EnglishTokenStream,
+    SpanishTokenStream,
+    Preprocessing,
+)
+from engine.documents import (
+    DocumentCorpus,
+    DirectoryCorpus,
+    TextFileDocument,
+    JsonDocument,
+    XMLDocument,
+)
 
 
 class CorpusManager:
@@ -55,20 +59,25 @@ class CorpusManager:
         language = self.preprocess.detect_language(lang_content)
         config.LANGUAGE = language
 
-        return self.preprocess.dic_process_position(self.corpus, progress_callback)
+        language_file_path = os.path.join(DATA_DIR, 'language.json')
+        with open(language_file_path, 'w') as language_file:
+            json.dump({'language': language}, language_file)
 
+        in_memory_index = self.preprocess.dic_process_position(self.corpus, progress_callback)
+
+        index_writer = DiskIndexWriter(DB_PATH, in_memory_index)
+        index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
+        index_writer.close()
+
+    def load_language_setting(self):
+        language_file_path = os.path.join(DATA_DIR, 'language.json')
+        if os.path.exists(language_file_path):
+            with open(language_file_path, 'r') as language_file:
+                language_data = json.load(language_file)
+                config.LANGUAGE = language_data.get('language')
 
 class SearchManager:
-    def __init__(
-        self,
-        corpus_manager,
-        preprocess,
-        view,
-        search_entry,
-        results_search_entry,
-        home_warning_label,
-        canvas,
-    ):
+    def __init__(self, corpus_manager, preprocess, view, search_entry, results_search_entry, home_warning_label, canvas):
         self.corpus_manager = corpus_manager
         self.view = view
         self.search_entry = search_entry
@@ -76,8 +85,32 @@ class SearchManager:
         self.home_warning_label = home_warning_label
         self.canvas = canvas
         self.preprocess = preprocess
+        self.disk_index = None
+
+    def initialize_disk_index(self):
+        if self.is_indexed():
+            self.disk_index = self.load_disk_index()
+
+    def is_indexed(self):
+        """Check if the index files exist."""
+        db_exists = os.path.exists(DB_PATH)
+        postings_exists = os.path.exists(POSTINGS_FILE_PATH)
+        return db_exists and postings_exists
+
+    def load_disk_index(self):
+        """Load the disk index if it exists."""
+        try:
+            return DiskPositionalIndex(DB_PATH, POSTINGS_FILE_PATH)
+        except Exception as e:
+            if self.home_warning_label:
+                self.home_warning_label.configure(text=f"Error loading disk index: {e}")
+            else:
+                print(f"Error loading disk index: {e}")
+            return None
 
     def perform_search(self):
+        self.corpus_manager.load_language_setting()
+
         if not self._corpus_ready():
             return
 
@@ -92,6 +125,7 @@ class SearchManager:
 
         try:
             query = BooleanQueryParser.parse_query(raw_query, self.preprocess)
+
             postings = self._get_postings(query)
 
             if not postings:
@@ -104,8 +138,8 @@ class SearchManager:
             self._handle_search_error(e)
 
     def _corpus_ready(self):
-        if not self.corpus_manager.corpus:
-            self.home_warning_label.configure(text="Please load a corpus first.")
+        if self.disk_index is None or not os.path.exists(DB_PATH):
+            self.home_warning_label.configure(text="Please index the corpus first.")
             return False
         return True
 
@@ -119,6 +153,16 @@ class SearchManager:
             self.view.show_page("ResultsPage")
         self.view.pages["ResultsPage"].clear_results()
 
+    def _is_phrase_query(self, query_component):
+        """
+        Recursively checks if any part of the query is a PhraseLiteral.
+        """
+        if isinstance(query_component, PhraseLiteral):
+            return True
+        elif hasattr(query_component, 'components'):
+            return any(self._is_phrase_query(comp) for comp in query_component.components)
+        return False
+
     def _get_postings(self, query):
         if not query:
             self.home_warning_label.configure(
@@ -126,20 +170,40 @@ class SearchManager:
             )
             return []
 
-        postings = query.getPostings(self.preprocess.p_i_index)
+        # Set the flag in DiskPositionalIndex based on the type of query
+        self.disk_index.set_phrase_query(self._is_phrase_query(query))
+
+        # Fetch postings from the DiskPositionalIndex
+        postings = query.getPostings(self.disk_index)
+
+        # Reset the flag after fetching postings
+        self.disk_index.set_phrase_query(False)
+
         return postings
 
     def _display_search_results(self, postings):
         results = len(postings)
         self.view.pages["ResultsPage"].results_frame.update_results_count(results)
 
-        data_items = [
-            f"Document ID# {posting.doc_id} - {next((d for d in self.corpus_manager.corpus if d.id == posting.doc_id), None).title}"
-            for posting in postings
-        ]
-
+        data_items = [f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}" for posting in postings]
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
+
+    def get_document_title(self, doc_id):
+        """Retrieve the title of a document based on its document ID."""
+        if self.disk_index:
+            try:
+                self.disk_index.db_cursor.execute('SELECT title FROM document_metadata WHERE doc_id = ?', (doc_id,))
+                result = self.disk_index.db_cursor.fetchone()
+                if result:
+                    return result[0]  # Returns the title
+                else:
+                    return "Title not found"
+            except Exception as e:
+                print(f"Error retrieving document title: {e}")
+                return "Error retrieving title"
+        else:
+            return "Index not loaded"
 
     def _handle_search_error(self, exception):
         self.view.pages["ResultsPage"].display_no_results_warning(str(exception))

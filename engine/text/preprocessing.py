@@ -48,7 +48,7 @@ class Preprocessing:
             if progress_callback:
                 progress_callback(i + 1)
 
-        return self.p_i_index.getVocabulary()
+        return self.p_i_index
 
     def process(self, query):
         """Processes the text based on its detected language."""

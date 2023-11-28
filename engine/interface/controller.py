@@ -29,8 +29,6 @@ class SearchController:
             canvas=None,
         )
 
-        self.ui_manager.search_manager = self.search_manager
-
         # Initialize the view
         self.view = SearchView(master, self, self.ui_manager)
 
@@ -51,3 +49,6 @@ class SearchController:
 
         # Update the UIManager's view reference
         self.ui_manager.view = self.view
+
+        self.search_manager.initialize_disk_index()
+        self.ui_manager.search_manager = self.search_manager
