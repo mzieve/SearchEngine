@@ -33,9 +33,10 @@ from engine.documents import (
 
 
 class CorpusManager:
-    def __init__(self):
+    def __init__(self, search_manager):
         self.corpus = None
         self.preprocess = Preprocessing()
+        self.search_manager = search_manager
 
     def load_corpus(self, folder_selected):
         extension_factories = {
@@ -68,6 +69,10 @@ class CorpusManager:
         index_writer = DiskIndexWriter(DB_PATH, in_memory_index)
         index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
         index_writer.close()
+
+        # After indexing, initialize the disk index
+        if self.search_manager:
+            self.search_manager.initialize_disk_index()
 
     def load_language_setting(self):
         language_file_path = os.path.join(DATA_DIR, 'language.json')

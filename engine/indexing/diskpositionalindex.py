@@ -9,7 +9,7 @@ class DiskPositionalIndex:
     def __init__(self, db_path, postings_file_path):
         """Initialize the DiskPositionalIndex. Connects to the SQLite database and loads term start positions from it."""
         self.postings_file_path = postings_file_path
-        self.db_conn = sqlite3.connect(db_path)
+        self.db_conn = sqlite3.connect(db_path, check_same_thread=False)
         self.db_cursor = self.db_conn.cursor()
         self.term_start_positions = self._start_positions()
         self.is_phrase_query = False  # Add this line

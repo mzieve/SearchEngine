@@ -6,9 +6,7 @@ class SearchController:
     def __init__(self, master):
         """Initialize the SearchController."""
         self.master = master
-
-        # Initialize model components
-        self.corpus_manager = CorpusManager()
+        self.corpus_manager = CorpusManager(None)
 
         # Initialize the UIManager
         self.ui_manager = UIManager(
@@ -52,3 +50,5 @@ class SearchController:
 
         self.search_manager.initialize_disk_index()
         self.ui_manager.search_manager = self.search_manager
+
+        self.corpus_manager.search_manager = self.search_manager

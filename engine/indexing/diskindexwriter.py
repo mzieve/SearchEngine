@@ -42,9 +42,12 @@ class DiskIndexWriter:
                 postings_file.write(df)
                 postings_file.write(postings_data)
 
-        for doc_id, document in enumerate(corpus.documents()):
-            self.db_cursor.execute('INSERT INTO document_metadata (doc_id, title) VALUES (?, ?)',
-                                   (doc_id, document.title))
+            for doc_id, document in enumerate(corpus.documents()):
+                # Check if doc_id already exists in the document_metadata table
+                self.db_cursor.execute('SELECT doc_id FROM document_metadata WHERE doc_id = ?', (doc_id,))
+                if not self.db_cursor.fetchone():
+                    # doc_id not found, so insert new record
+                    self.db_cursor.execute('INSERT INTO document_metadata (doc_id, title) VALUES (?, ?)', (doc_id, document.title))
 
         self.db_conn.commit()
 
