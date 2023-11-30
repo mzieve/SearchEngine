@@ -1,6 +1,6 @@
 from .tokenprocessor import TokenProcessor
-import re
 from stemming.porter2 import stem  # type: ignore
+import re
 
 
 class BasicTokenProcessor(TokenProcessor):

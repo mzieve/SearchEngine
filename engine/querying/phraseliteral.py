@@ -40,14 +40,17 @@ class PhraseLiteral(QueryComponent):
 
         while i < len(p1) and j < len(p2):
             if p1[i].doc_id == p2[j].doc_id:
+                l_positions = p1[i].positions
+                r_positions = p2[j].positions
+
+                # Find matching positions
                 positions = []
-                for pos in p1[i].positions:
-                    if pos + 1 in p2[j].positions:
+                for pos in l_positions:
+                    if (pos + 1) in r_positions:
                         positions.append(pos + 1)
 
                 if positions:
-                    posting = Posting(p1[i].doc_id, positions[0])
-                    posting.positions.extend(positions[1:])
+                    posting = Posting(p1[i].doc_id, positions)
                     answer.append(posting)
 
                 i += 1
