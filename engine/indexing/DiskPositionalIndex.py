@@ -12,7 +12,7 @@ class DiskPositionalIndex(Index):
         """Constructs an empty index"""
         self.postings_path = postings_db_files_path
         db_file_name = os.path.join(postings_db_files_path, "postings_start.db")
-        conn = sqlite3.connect(db_file_name)
+        conn = sqlite3.connect(db_file_name, check_same_thread=False)
         self.cursor = conn.cursor()
 
     def goto_term(self, term: str):
