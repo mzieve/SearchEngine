@@ -1,5 +1,5 @@
 from engine.interface.controller import SearchController
-import customtkinter # type: ignore
+import customtkinter  # type: ignore
 import sys
 
 if __name__ == "__main__":

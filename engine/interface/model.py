@@ -1,8 +1,19 @@
-from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
-from config import DB_PATH, POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, DATA_DIR
+from engine.indexing import (
+    Index,
+    PositionalInvertedIndex,
+    DiskIndexWriter,
+    DiskPositionalIndex,
+)
+from config import (
+    DB_PATH,
+    POSTINGS_FILE_PATH,
+    DOC_WEIGHTS_FILE_PATH,
+    DATA_DIR,
+    SPIMI_DIR,
+)
 from engine.querying import BooleanQueryParser, PhraseLiteral
 from tkinter import filedialog, Label, ttk
-import customtkinter # type: ignore
+import customtkinter  # type: ignore
 from pathlib import Path
 from io import StringIO, TextIOWrapper
 from .decorators import threaded, threaded_value
@@ -29,6 +40,7 @@ from engine.documents import (
     TextFileDocument,
     JsonDocument,
     XMLDocument,
+    SPIMI,
 )
 
 
@@ -50,39 +62,47 @@ class CorpusManager:
         return self.corpus
 
     def index_corpus(self, progress_callback=None):
-        # Detect the language using the first document in the corpus
+        """
         first_doc_content = self.corpus[0].get_content()
-        if isinstance(first_doc_content, io.TextIOWrapper):
-            lang_content = first_doc_content.read()
-        else:
-            lang_content = " ".join(first_doc_content)
-
+        lang_content = (
+            first_doc_content.read()
+            if isinstance(first_doc_content, io.TextIOWrapper)
+            else " ".join(first_doc_content)
+        )
         language = self.preprocess.detect_language(lang_content)
         config.LANGUAGE = language
 
-        language_file_path = os.path.join(DATA_DIR, 'language.json')
-        with open(language_file_path, 'w') as language_file:
-            json.dump({'language': language}, language_file)
+        # Write language to file
+        language_file_path = os.path.join(DATA_DIR, "language.json")
+        with open(language_file_path, "w") as language_file:
+            json.dump({"language": language}, language_file)
+        """
 
-        in_memory_index = self.preprocess.dic_process_position(self.corpus, progress_callback)
+        spimi = SPIMI(SPIMI_DIR, self.corpus)
+        spimi.spimi_index(progress_callback=progress_callback)
 
-        index_writer = DiskIndexWriter(DB_PATH, in_memory_index)
-        index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
-        index_writer.close()
-
-        # After indexing, initialize the disk index
         if self.search_manager:
             self.search_manager.initialize_disk_index()
 
     def load_language_setting(self):
-        language_file_path = os.path.join(DATA_DIR, 'language.json')
+        language_file_path = os.path.join(DATA_DIR, "language.json")
         if os.path.exists(language_file_path):
-            with open(language_file_path, 'r') as language_file:
+            with open(language_file_path, "r") as language_file:
                 language_data = json.load(language_file)
-                config.LANGUAGE = language_data.get('language')
+                config.LANGUAGE = language_data.get("language")
+
 
 class SearchManager:
-    def __init__(self, corpus_manager, preprocess, view, search_entry, results_search_entry, home_warning_label, canvas):
+    def __init__(
+        self,
+        corpus_manager,
+        preprocess,
+        view,
+        search_entry,
+        results_search_entry,
+        home_warning_label,
+        canvas,
+    ):
         self.corpus_manager = corpus_manager
         self.view = view
         self.search_entry = search_entry
@@ -164,8 +184,10 @@ class SearchManager:
         """
         if isinstance(query_component, PhraseLiteral):
             return True
-        elif hasattr(query_component, 'components'):
-            return any(self._is_phrase_query(comp) for comp in query_component.components)
+        elif hasattr(query_component, "components"):
+            return any(
+                self._is_phrase_query(comp) for comp in query_component.components
+            )
         return False
 
     def _get_postings(self, query):
@@ -190,7 +212,10 @@ class SearchManager:
         results = len(postings)
         self.view.pages["ResultsPage"].results_frame.update_results_count(results)
 
-        data_items = [f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}" for posting in postings]
+        data_items = [
+            f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}"
+            for posting in postings
+        ]
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
 
@@ -198,7 +223,9 @@ class SearchManager:
         """Retrieve the title of a document based on its document ID."""
         if self.disk_index:
             try:
-                self.disk_index.db_cursor.execute('SELECT title FROM document_metadata WHERE doc_id = ?', (doc_id,))
+                self.disk_index.db_cursor.execute(
+                    "SELECT title FROM document_metadata WHERE doc_id = ?", (doc_id,)
+                )
                 result = self.disk_index.db_cursor.fetchone()
                 if result:
                     return result[0]  # Returns the title
@@ -233,7 +260,9 @@ class UIManager:
             return
 
         # Create the progress frame
-        self.progress_frame = customtkinter.CTkFrame(self.view.pages["HomePage"].centered_frame, fg_color="#2b2b2b")
+        self.progress_frame = customtkinter.CTkFrame(
+            self.view.pages["HomePage"].centered_frame, fg_color="#2b2b2b"
+        )
         self.progress_frame.grid(row=4, column=0, pady=0)
 
         self.progress_frame.rowconfigure(0, weight=0, minsize=30)
@@ -244,10 +273,10 @@ class UIManager:
             mode="determinate",
             width=500,
             height=10,
-            progress_color="#7236bf"
+            progress_color="#7236bf",
         )
         self.progress.set(0)
-        self.progress.grid(row=0, column=0, pady=(0,15))
+        self.progress.grid(row=0, column=0, pady=(0, 15))
 
         self.progress_info_label = customtkinter.CTkLabel(
             self.progress_frame,
@@ -262,22 +291,21 @@ class UIManager:
         self.total_documents = sum(1 for _ in self.corpus_manager.corpus)
 
         # Start the indexing
-        self.corpus_manager.index_corpus(self.update_progress_ui)
+        self.corpus_manager.index_corpus(progress_callback=self.update_progress_ui)
 
         # After indexing
         self.progress.grid_forget()
         self.progress_info_label.grid_forget()
         self.progress_frame.grid_forget()
 
-    def update_progress_ui(self, current_document_index):
-       """Schedule the progress UI update."""
-       self.master.after(0, self._update_progress_ui_on_main_thread, current_document_index)
-
-    def _update_progress_ui_on_main_thread(self, current_document_index):
+    def update_progress_ui(self, current_document_index, total_documents):
         """Update the progress UI based on the indexed documents."""
-        progress_fraction = current_document_index / self.total_documents
-        percentage_complete = progress_fraction * 100
+        progress_fraction = (current_document_index + 1) / total_documents
+        self.master.after(0, self._update_progress_ui_on_main_thread, progress_fraction)
 
+    def _update_progress_ui_on_main_thread(self, progress_fraction):
+        """Update the progress UI on the main thread."""
+        percentage_complete = progress_fraction * 100
         self.progress.set(progress_fraction)
         self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
 

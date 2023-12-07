@@ -5,6 +5,7 @@ from typing import Iterable
 from .index import Index
 from .postings import Posting
 
+
 class DiskPositionalIndex:
     def __init__(self, db_path, postings_file_path):
         """Initialize the DiskPositionalIndex. Connects to the SQLite database and loads term start positions from it."""
@@ -35,7 +36,7 @@ class DiskPositionalIndex:
         last_position = 0
         positions = []
         for _ in range(tftd):
-            position_gap = struct.unpack('I', postings_file.read(4))[0]
+            position_gap = struct.unpack("I", postings_file.read(4))[0]
             position = last_position + position_gap
             positions.append(position)
             last_position = position
@@ -48,22 +49,21 @@ class DiskPositionalIndex:
         else:
             return self.skipPostings(term)
 
-
     def positionPostings(self, term: str) -> Iterable[Posting]:
-        """ Retrieves postings with positions for a given term."""
+        """Retrieves postings with positions for a given term."""
         start_position = self._start_position(term)
         if start_position is None:
             return []
 
         postings = []
-        with open(self.postings_file_path, 'rb') as postings_file:
+        with open(self.postings_file_path, "rb") as postings_file:
             postings_file.seek(start_position)
-            dft = struct.unpack('I', postings_file.read(4))[0]
+            dft = struct.unpack("I", postings_file.read(4))[0]
             last_doc_id = 0
             for _ in range(dft):
-                doc_gap = struct.unpack('I', postings_file.read(4))[0]
+                doc_gap = struct.unpack("I", postings_file.read(4))[0]
                 doc_id = last_doc_id + doc_gap
-                tftd = struct.unpack('I', postings_file.read(4))[0]
+                tftd = struct.unpack("I", postings_file.read(4))[0]
                 positions = self._read_positions(postings_file, tftd)
                 postings.append(Posting(doc_id, positions))
                 last_doc_id = doc_id
@@ -77,14 +77,14 @@ class DiskPositionalIndex:
             return []
 
         postings = []
-        with open(self.postings_file_path, 'rb') as postings_file:
+        with open(self.postings_file_path, "rb") as postings_file:
             postings_file.seek(start_position)
-            dft = struct.unpack('I', postings_file.read(4))[0]
+            dft = struct.unpack("I", postings_file.read(4))[0]
             last_doc_id = 0
             for _ in range(dft):
-                doc_gap = struct.unpack('I', postings_file.read(4))[0]
+                doc_gap = struct.unpack("I", postings_file.read(4))[0]
                 doc_id = last_doc_id + doc_gap
-                tftd = struct.unpack('I', postings_file.read(4))[0]
+                tftd = struct.unpack("I", postings_file.read(4))[0]
                 postings_file.seek(tftd * 4, os.SEEK_CUR)
                 postings.append(Posting(doc_id, 0))
                 last_doc_id = doc_id

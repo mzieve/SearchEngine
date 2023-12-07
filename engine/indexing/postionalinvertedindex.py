@@ -1,6 +1,7 @@
 from typing import Iterable
 from .postings import Posting
 from .index import Index
+import sys
 
 
 class PositionalInvertedIndex(Index):
@@ -32,3 +33,7 @@ class PositionalInvertedIndex(Index):
                 self.index[term].append(Posting(doc_id, position))
             elif latest_posting.doc_id == doc_id:
                 self.index[term][-1].positions.append(position)
+
+    def clear(self):
+        """Clears the index."""
+        self.index.clear()

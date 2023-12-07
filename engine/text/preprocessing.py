@@ -21,34 +21,35 @@ class Preprocessing:
         detected_lang = detect(text)
         return {"en": "english", "es": "spanish"}.get(detected_lang, "english")
 
-    def dic_process_position(self, corpus, progress_callback=None):
+    def dic_process_position(self, document, progress_callback=None):
         """Position each document based on the detected language"""
         eng_processor = BasicTokenProcessor()
         es_processor = SpanishTokenProcessor()
 
-        for i, doc_path in enumerate(corpus):
-            if config.LANGUAGE == "english":
-                tokens = EnglishTokenStream(doc_path.get_content())
-                processor = eng_processor
-            elif config.LANGUAGE == "spanish":
-                tokens = SpanishTokenStream(doc_path.get_content(), nlp=self.nlp)
-                processor = es_processor
+        """
+        if config.LANGUAGE == "english":
+            tokens = EnglishTokenStream(document.get_content())
+            processor = BasicTokenProcessor()
+        elif config.LANGUAGE == "spanish":
+            tokens = SpanishTokenStream(document.get_content(), nlp=self.nlp)
+            processor = SpanishTokenProcessor()
+        """
 
-            position = 0
+        tokens = EnglishTokenStream(document.get_content())
+        processor = BasicTokenProcessor()
 
-            for token in tokens:
-                position += 1
-                tok_types = processor.process_token(token)
+        position = 0
+        for token in tokens:
+            position += 1
+            tok_types = processor.process_token(token)
 
-                for tok_type in tok_types:
-                    term = processor.normalize_type(tok_type)
-                    self.p_i_index.addTerm(term, doc_path.id, position)
+            for tok_type in tok_types:
+                term = processor.normalize_type(tok_type)
+                self.p_i_index.addTerm(term, document.id, position)
 
-            # After processing each document, update the progress.
-            if progress_callback:
-                progress_callback(i + 1)
-
-        return self.p_i_index
+        # Update the progress after processing the document, if callback provided
+        if progress_callback:
+            progress_callback()
 
     def process(self, query):
         """Processes the text based on its detected language."""

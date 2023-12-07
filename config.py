@@ -5,14 +5,16 @@ import os
 LANGUAGE: Optional[str] = None
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
-DB_DIR = os.path.join(DATA_DIR, 'db')
-POSTINGS_DIR = os.path.join(DATA_DIR, 'postings')
-WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
+DATA_DIR = os.path.join(BASE_DIR, "data")
+DB_DIR = os.path.join(DATA_DIR, "db")
+POSTINGS_DIR = os.path.join(DATA_DIR, "postings")
+WEIGHTS_DIR = os.path.join(DATA_DIR, "weights")
+SPIMI_DIR = os.path.join(DATA_DIR, "spimi")
 
-DB_PATH = os.path.join(DB_DIR, 'index.db')
-POSTINGS_FILE_PATH = os.path.join(POSTINGS_DIR, 'postings.bin')
-DOC_WEIGHTS_FILE_PATH = os.path.join(WEIGHTS_DIR, 'docWeights.bin')
+DB_PATH = os.path.join(DB_DIR, "index.db")
+POSTINGS_FILE_PATH = os.path.join(POSTINGS_DIR, "postings.bin")
+DOC_WEIGHTS_FILE_PATH = os.path.join(WEIGHTS_DIR, "docWeights.bin")
+SPIMI_FILE_PATH = os.path.join(SPIMI_DIR, "spimi.bin")
 
 # Ensure directories exist
 os.makedirs(DB_DIR, exist_ok=True)
