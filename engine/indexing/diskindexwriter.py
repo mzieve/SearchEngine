@@ -76,7 +76,7 @@ class DiskIndexWriter:
             postings = self.index.getPostings(term)  
             for posting in postings:
                 tf = len(posting.positions)
-                document_lengths[posting.doc_id] += tf ** 2
+                document_lengths[posting.doc_id] += (1 +math.log(tf)) ** 2
 
         for doc_id in document_lengths:
             document_lengths[doc_id] = math.sqrt(document_lengths[doc_id])
