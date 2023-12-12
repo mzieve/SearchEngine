@@ -1,14 +1,9 @@
-from engine.indexing import DiskIndexWriter, PositionalInvertedIndex, Posting
+from engine.indexing import PositionalInvertedIndex
 from engine.text import Preprocessing
 from config import DB_PATH, POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, DATA_DIR
-from pympler import asizeof
 from queue import PriorityQueue
 from collections import defaultdict
-import json
 import os
-import heapq
-import config
-
 
 class SPIMI:
     def __init__(self, output_dir, corpus):

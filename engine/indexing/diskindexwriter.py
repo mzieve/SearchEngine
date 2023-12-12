@@ -80,7 +80,6 @@ class DiskIndexWriter:
 
         for doc_id in document_lengths:
             document_lengths[doc_id] = math.sqrt(document_lengths[doc_id])
-            print(f"Doc ID: {doc_id}, L_d: {document_lengths[doc_id]}")
 
         return document_lengths
 
@@ -89,7 +88,6 @@ class DiskIndexWriter:
         with open(doc_weights_file_path, 'wb') as doc_weights_file:
             for doc_id in sorted(doc_lengths.keys()):
                 L_d = doc_lengths[doc_id]
-                print(f"Doc ID: {doc_id}, L_d: {L_d}")
                 doc_weights_file.write(struct.pack('d', L_d))
 
     def close(self):

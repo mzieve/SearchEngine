@@ -3,3 +3,4 @@ from .postings import Posting
 from .postionalinvertedindex import PositionalInvertedIndex
 from .diskindexwriter import DiskIndexWriter
 from .diskpositionalindex import DiskPositionalIndex
+from .spimi import SPIMI

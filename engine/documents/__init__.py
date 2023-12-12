@@ -4,4 +4,3 @@ from .document import Document
 from .jsondocument import JsonDocument
 from .textfiledocument import TextFileDocument
 from .xmldocument import XMLDocument
-from .spimi import SPIMI

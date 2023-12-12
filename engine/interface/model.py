@@ -2,6 +2,7 @@ from engine.indexing import (
     PositionalInvertedIndex,
     DiskIndexWriter,
     DiskPositionalIndex,
+    SPIMI
 )
 from config import (
     DB_PATH,
@@ -25,7 +26,6 @@ from engine.documents import (
     TextFileDocument,
     JsonDocument,
     XMLDocument,
-    SPIMI,
 )
 
 
@@ -135,7 +135,7 @@ class SearchManager:
                 print(f"Error loading disk index: {e}")
             return None
 
-    def perform_search(self):
+    def perform_search(self, ranked_search_enabled=False):
         """Perform the search operation."""
         self.corpus_manager.load_language_setting()
 
@@ -165,9 +165,10 @@ class SearchManager:
                 self.view.pages["ResultsPage"].display_no_results_warning(raw_query)
                 return
             
-            ranked_postings = self.ranked_query_processor.rank_documents(query, postings)
+            use_okapi = self.view.pages["ResultsPage"].okapi_var.get()
+            results = self.ranked_query_processor.rank_documents(query, postings, use_okapi)
 
-            self._display_search_results(ranked_postings)
+            self._display_search_results(results)
 
         except Exception as e:
             self._handle_search_error(e)
@@ -218,19 +219,28 @@ class SearchManager:
 
         return postings
 
-    def _display_search_results(self, ranked_postings):
+    def _display_search_results(self, results):
         """Display the search results on the ResultsPage."""
-        results = len(ranked_postings)
-        self.view.pages["ResultsPage"].results_frame.update_results_count(results)
+        results_count = len(results)
+        self.view.pages["ResultsPage"].results_frame.update_results_count(results_count)
 
-        # Format data items to include the score
-        data_items = [
-            f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
-            for doc_id, score in ranked_postings
-        ]
+        # Check if the results are ranked (contain scores) or not
+        if results and isinstance(results[0], tuple):
+            # Handle ranked postings (doc_id, score)
+            data_items = [
+                f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
+                for doc_id, score in results
+            ]
+        else:
+            # Handle regular postings (just Posting objects)
+            data_items = [
+                f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}"
+                for posting in results
+            ]
 
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
+
 
     def get_document_title(self, doc_id):
         """Retrieve the title of a document based on its document ID."""
@@ -322,9 +332,9 @@ class UIManager:
         self.progress.set(progress_fraction)
         self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
 
-    def perform_search_ui(self):
-        # UI interactions for the search operation run in a new thread
-        self.search_manager.perform_search()
+    def perform_search_ui(self, ranked_search_enabled=False):
+        # Pass the ranked_search_enabled parameter to perform_search
+        self.search_manager.perform_search(ranked_search_enabled)
 
     def show_warning(self, message):
         self.view.pages["HomePage"].home_warning_label.configure(text=message)
