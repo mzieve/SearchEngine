@@ -1,5 +1,4 @@
 from engine.indexing import (
-    Index,
     PositionalInvertedIndex,
     DiskIndexWriter,
     DiskPositionalIndex,
@@ -9,33 +8,19 @@ from config import (
     POSTINGS_FILE_PATH,
     DOC_WEIGHTS_FILE_PATH,
     DATA_DIR,
-    SPIMI_DIR,
+    BUCKET_DIR,
 )
-from engine.querying import BooleanQueryParser, PhraseLiteral
-from tkinter import filedialog, Label, ttk
+from engine.querying import BooleanQueryParser, PhraseLiteral, RankedQuery
+from tkinter import filedialog
 import customtkinter  # type: ignore
-from pathlib import Path
-from io import StringIO, TextIOWrapper
-from .decorators import threaded, threaded_value
-import time
-import re
+from .decorators import threaded
 import traceback
-import queue
 import io
-import builtins
 import config
 import os
 import json
-import sqlite3
-from engine.text import (
-    BasicTokenProcessor,
-    SpanishTokenProcessor,
-    EnglishTokenStream,
-    SpanishTokenStream,
-    Preprocessing,
-)
+from engine.text import Preprocessing, SpellingCorrection
 from engine.documents import (
-    DocumentCorpus,
     DirectoryCorpus,
     TextFileDocument,
     JsonDocument,
@@ -46,8 +31,10 @@ from engine.documents import (
 
 class CorpusManager:
     def __init__(self, search_manager):
+        """Initialize the CorpusManager."""
         self.corpus = None
         self.preprocess = Preprocessing()
+        self.p_i_index = PositionalInvertedIndex()
         self.search_manager = search_manager
 
     def load_corpus(self, folder_selected):
@@ -62,7 +49,7 @@ class CorpusManager:
         return self.corpus
 
     def index_corpus(self, progress_callback=None):
-        """
+        """Index the corpus using SPIMI."""
         first_doc_content = self.corpus[0].get_content()
         lang_content = (
             first_doc_content.read()
@@ -76,11 +63,21 @@ class CorpusManager:
         language_file_path = os.path.join(DATA_DIR, "language.json")
         with open(language_file_path, "w") as language_file:
             json.dump({"language": language}, language_file)
-        """
 
-        spimi = SPIMI(SPIMI_DIR, self.corpus)
+        # Processing SPIMI
+        spimi = SPIMI(BUCKET_DIR, self.corpus)
         spimi.spimi_index(progress_callback=progress_callback)
 
+        # Process Merged Files
+        merged_postings_file = os.path.join(BUCKET_DIR, "merged_postings.txt")
+        memory_index = self.preprocess.process_merged(merged_postings_file)
+
+        # Write to Disk
+        disk_index_writer = DiskIndexWriter(DB_PATH, memory_index)
+        disk_index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
+        disk_index_writer.close()
+
+        # Initialize the disk index
         if self.search_manager:
             self.search_manager.initialize_disk_index()
 
@@ -93,6 +90,7 @@ class CorpusManager:
 
 
 class SearchManager:
+    """Handles the search operation."""
     def __init__(
         self,
         corpus_manager,
@@ -103,6 +101,7 @@ class SearchManager:
         home_warning_label,
         canvas,
     ):
+        """Initialize the SearchManager."""
         self.corpus_manager = corpus_manager
         self.view = view
         self.search_entry = search_entry
@@ -113,8 +112,11 @@ class SearchManager:
         self.disk_index = None
 
     def initialize_disk_index(self):
+        """Initialize the disk index."""
         if self.is_indexed():
             self.disk_index = self.load_disk_index()
+            self.spelling_correction = SpellingCorrection(self.disk_index)
+            self.ranked_query_processor = RankedQuery(self.disk_index)
 
     def is_indexed(self):
         """Check if the index files exist."""
@@ -134,6 +136,7 @@ class SearchManager:
             return None
 
     def perform_search(self):
+        """Perform the search operation."""
         self.corpus_manager.load_language_setting()
 
         if not self._corpus_ready():
@@ -144,6 +147,11 @@ class SearchManager:
         if not raw_query:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
+
+        if not self.disk_index.getPostings(raw_query):
+            corrected_query = self.spelling_correction.suggest_corrections(raw_query)
+            if corrected_query:
+                print(f"Did you mean: {corrected_query}?")
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()
@@ -156,8 +164,10 @@ class SearchManager:
             if not postings:
                 self.view.pages["ResultsPage"].display_no_results_warning(raw_query)
                 return
+            
+            ranked_postings = self.ranked_query_processor.rank_documents(query, postings)
 
-            self._display_search_results(postings)
+            self._display_search_results(ranked_postings)
 
         except Exception as e:
             self._handle_search_error(e)
@@ -208,14 +218,17 @@ class SearchManager:
 
         return postings
 
-    def _display_search_results(self, postings):
-        results = len(postings)
+    def _display_search_results(self, ranked_postings):
+        """Display the search results on the ResultsPage."""
+        results = len(ranked_postings)
         self.view.pages["ResultsPage"].results_frame.update_results_count(results)
 
+        # Format data items to include the score
         data_items = [
-            f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}"
-            for posting in postings
+            f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
+            for doc_id, score in ranked_postings
         ]
+
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
 
@@ -228,7 +241,7 @@ class SearchManager:
                 )
                 result = self.disk_index.db_cursor.fetchone()
                 if result:
-                    return result[0]  # Returns the title
+                    return result[0]  
                 else:
                     return "Title not found"
             except Exception as e:

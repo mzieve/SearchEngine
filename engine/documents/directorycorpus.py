@@ -4,6 +4,7 @@ from .document import Document
 from pathlib import Path
 from . import textfiledocument, jsondocument, xmldocument
 from typing import Dict, Optional
+from config import TOTAL_DOCS
 import json
 
 
@@ -80,6 +81,8 @@ class DirectoryCorpus:
                     # For other file types
                     self._documents[next_id] = self.factories[f.suffix](f, next_id)
                 next_id += 1
+        global TOTAL_DOCS
+        TOTAL_DOCS = next_id
 
     @staticmethod
     def load_directory(

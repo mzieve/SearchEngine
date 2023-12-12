@@ -1,15 +1,13 @@
 from engine.indexing import DiskIndexWriter, PositionalInvertedIndex, Posting
 from engine.text import Preprocessing
 from config import DB_PATH, POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, DATA_DIR
+from pympler import asizeof
+from queue import PriorityQueue
+from collections import defaultdict
 import json
 import os
-import glob
 import heapq
-import psutil
-import io
 import config
-import pickle
-import sys
 
 
 class SPIMI:
@@ -19,135 +17,95 @@ class SPIMI:
         self.in_memory_index = {}
         self.file_counter = 0
         self.preprocessing = Preprocessing()
+        self.p_i_index = PositionalInvertedIndex()
         os.makedirs(self.output_dir, exist_ok=True)
 
     def spimi_index(self, progress_callback=None):
+        total_positions = 0
+        total_memory = 0
+
         for i, document in enumerate(self.corpus):
-            self.process_document(
-                document,
-                progress_callback=lambda: progress_callback(i, len(self.corpus)),
-            )
-            if self.memory_is_exhausted():
-                self.sort_and_write_to_disk()
+            total_memory += 4
+            for term, doc_id, position in self.preprocessing.dic_process_position(document):
+                self.p_i_index.addTerm(term, doc_id, position)
+                total_memory += 5
 
-        # Write any remaining data to disk
-        if self.in_memory_index:
-            self.sort_and_write_to_disk()
+                if self.memory_limit(total_memory):
+                    self.memory_index()
+                    total_memory = 0
+                    self.p_i_index.clear()
 
-        final_merged_index = self.merge_files()
+            if progress_callback:
+                progress_callback(i, len(self.corpus))
 
-        # Convert final_merged_index dictionary into PositionalInvertedIndex
-        final_index = PositionalInvertedIndex()
-        for term, postings in final_merged_index.items():
-            for doc_id, position in postings:
-                final_index.addTerm(term, doc_id, position)
-
-        # Now pass final_index to DiskIndexWriter
-        disk_index_writer = DiskIndexWriter(DB_PATH, final_index)
-        disk_index_writer.write_index(
-            POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus
-        )
-        disk_index_writer.close()
+        self.memory_index()
+        self.merge_files()
 
         print("SPIMI indexing completed.")
 
-    def process_document(self, document, progress_callback=None):
-        # Document processing and position extraction
-        self.preprocessing.dic_process_position(document, progress_callback)
-        for term, postings in self.preprocessing.p_i_index.index.items():
-            for posting in postings:
-                # Handle multiple positions per posting
-                for position in posting.positions:
-                    self.add_to_index(term, posting.doc_id, position)
-
-    def add_to_index(self, term, doc_id, position):
-        # Considering alternative data structures for memory efficiency
-        if term not in self.in_memory_index:
-            self.in_memory_index[term] = []
-        # Store as a list initially and deduplicate during merge
-        self.in_memory_index[term].append((doc_id, position))
-
-    def sort_and_write_to_disk(self):
+    def memory_index(self):
         """Sorts the in-memory index and writes it to disk."""
-        sorted_terms = sorted(self.in_memory_index.keys())
-        file_path = os.path.join(self.output_dir, f"spimi_{self.file_counter}.txt")
-        with open(file_path, "wb") as file:
-            for term in sorted_terms:
-                # Convert list to set for deduplication before dumping
-                postings = sorted(set(self.in_memory_index[term]))
-                pickle.dump((term, postings), file)
+        file_path = os.path.join(self.output_dir, f"bucket_{self.file_counter}.txt")
+        with open(file_path, "w", encoding='utf-8') as file:
+            formatted_index = self.p_i_index.export_sorted_index()
+            file.write(formatted_index)
+
         self.file_counter += 1
-        self.in_memory_index.clear()
+        self.p_i_index.clear()
 
     def merge_files(self):
-        index_files = glob.glob(os.path.join(self.output_dir, "spimi_*.txt"))
-        streams = [open(file, "rb") for file in index_files]
-        pq = []
-        current_terms = [None] * len(streams)  # To keep track of the current state
+        print("Merging Files...")
 
-        # Initial loading of terms from each stream
-        for i, stream in enumerate(streams):
-            try:
-                current_terms[i] = pickle.load(stream)
-                heapq.heappush(pq, (current_terms[i][0], i))
-            except EOFError:
-                pass
+        # Open file-read streams
+        file_streams = [open(os.path.join(self.output_dir, f"bucket_{i}.txt"), "r", encoding='utf-8') for i in range(self.file_counter)]
 
-        final_index_path = os.path.join(self.output_dir, "spimi.txt")
-        with open(final_index_path, "wb") as final_index_file:
-            while pq:
-                smallest_term, stream_index = heapq.heappop(pq)
-                lists_to_merge = [current_terms[stream_index][1]]
+        # Initialize priority queue with the first term and its postings from each file
+        pq = PriorityQueue()
+        for i, stream in enumerate(file_streams):
+            line = stream.readline().strip()
+            if line:
+                term, postings = line.split(": ", 1)
+                for posting in postings.split(";"):
+                    doc_id, positions = posting.split(",", 1)
+                    pq.put((term, int(doc_id), positions, i))
 
-                # Merge postings lists for the smallest term
-                while pq and pq[0][0] == smallest_term:
-                    _, next_stream_index = heapq.heappop(pq)
-                    lists_to_merge.append(current_terms[next_stream_index][1])
+        # Open file-write stream for the final merged postings file
+        with open(os.path.join(self.output_dir, "merged_postings.txt"), "w", encoding='utf-8') as merged_file:
+            current_term = None
+            current_postings = defaultdict(list)
 
-                merged_postings = self.merge_postings(lists_to_merge)
-                pickle.dump((smallest_term, merged_postings), final_index_file)
+            while not pq.empty():
+                term, doc_id, positions, file_idx = pq.get()
+                positions_set = sorted(set(map(int, positions.strip('[]').split(','))))
 
-                # Read next term from the stream that just got used
-                try:
-                    current_terms[stream_index] = pickle.load(streams[stream_index])
-                    heapq.heappush(pq, (current_terms[stream_index][0], stream_index))
-                except EOFError:
-                    pass
+                if term != current_term and current_term is not None:
+                    # Write postings for the previous term
+                    merged_postings = '; '.join(f"{doc_id},{pos_list}" for doc_id, pos_list in current_postings.items())
+                    merged_file.write(f"{current_term}: {merged_postings}\n")
+                    current_postings = defaultdict(list)
 
-        for stream in streams:
+                current_term = term
+                current_postings[doc_id].extend(positions_set)
+
+                # Read next line from the file that the term came from
+                next_line = file_streams[file_idx].readline().strip()
+                if next_line:
+                    next_term, next_postings = next_line.split(": ", 1)
+                    for posting in next_postings.split(";"):
+                        next_doc_id, next_positions = posting.split(",", 1)
+                        pq.put((next_term, int(next_doc_id), next_positions, file_idx))
+
+            # Write postings for the last term
+            if current_term is not None:
+                merged_postings = '; '.join(f"{doc_id},{pos_list}" for doc_id, pos_list in current_postings.items())
+                merged_file.write(f"{current_term}: {merged_postings}\n")
+
+        # Close all file streams
+        for stream in file_streams:
             stream.close()
 
-        final_merged_index = {}
-        with open(final_index_path, "rb") as final_index_file:
-            while True:
-                try:
-                    term, postings = pickle.load(final_index_file)
-                    final_merged_index[term] = postings
-                except EOFError:
-                    break
-        return final_merged_index
+        print("Merge complete.")
 
-    def merge_postings(self, postings_lists):
-        # Optimized to avoid creating an intermediate list
-        merged_postings_set = set()
-        for postings in postings_lists:
-            merged_postings_set.update(postings)
-        return sorted(merged_postings_set)
-
-    def memory_is_exhausted(self):
-        MEMORY_LIMIT = 50000000 
-        estimated_memory_usage = self.estimate_memory_usage()
-        return estimated_memory_usage > MEMORY_LIMIT
-
-    def estimate_memory_usage(self):
-        # New implementation for a more accurate estimation
-        return self.estimate_dict_memory_usage(self.in_memory_index)
-
-    def estimate_dict_memory_usage(self, dictionary):
-        size = sys.getsizeof(dictionary)
-        for key, value in dictionary.items():
-            size += sys.getsizeof(key)
-            size += sys.getsizeof(value)  # Assuming value is a set
-            if isinstance(value, set):
-                size += sum(sys.getsizeof(item) for item in value)
-        return size
+    def memory_limit(self, total_memory):
+        MEMORY_LIMIT = 250000  
+        return total_memory > MEMORY_LIMIT

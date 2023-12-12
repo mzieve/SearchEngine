@@ -322,6 +322,7 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
         parts = data.split(" - ")
         doc_id_str = parts[0].replace("Document ID# ", "")
         doc_title = parts[1]
+        score_str = parts[2]  # Assuming the score is the third part
 
         doc_id = int(doc_id_str)
 
@@ -336,7 +337,11 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
 
         customtkinter.CTkLabel(
             result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
-        ).grid(row=1, column=0, sticky="w", pady=(0, 25))
+        ).grid(row=1, column=0, sticky="w")
+
+        customtkinter.CTkLabel(
+            result_frame, text=score_str, font=("Helvetica", 11)
+        ).grid(row=2, column=0, sticky="w", pady=(0, 25))
 
         return result_frame
 

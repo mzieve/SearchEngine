@@ -15,4 +15,4 @@ venv/
 postings.bin
 index.db
 language.json
-spimi/
+bucket/

@@ -11,8 +11,6 @@ class EnglishTokenStream(TokenStream):
 
     def __iter__(self) -> Iterator[str]:
         """Returns an iterator over the tokens in the stream."""
-        # The source iterator probably returns lines of text, not words.
-        # Get the next line, then yield each token from it.
         for token in self.source:
             for t in token.split(" "):
                 tok = t.strip()
