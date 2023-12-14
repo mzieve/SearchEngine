@@ -98,29 +98,6 @@ class DiskPositionalIndex:
 
         return postings
 
-    def get_term_frequency(self, term: str, doc_id: int) -> int:
-        """Retrieves the term frequency (tf) for a specific term in a specific document."""
-        start_position = self._start_position(term)
-        if start_position is None:
-            return 0
-
-        with open(self.postings_file_path, "rb") as postings_file:
-            postings_file.seek(start_position)
-            dft = struct.unpack("I", postings_file.read(4))[0]
-            last_doc_id = 0
-            for _ in range(dft):
-                doc_gap = struct.unpack("I", postings_file.read(4))[0]
-                current_doc_id = last_doc_id + doc_gap
-                tftd = struct.unpack("I", postings_file.read(4))[0]
-                # If the current doc_id is the one we're looking for, return its tf
-                if current_doc_id == doc_id:
-                    return tftd
-                # Skip the positions data for this document
-                postings_file.seek(tftd * 4, os.SEEK_CUR)
-                last_doc_id = current_doc_id
-        # If we've gone through all postings and haven't found the doc_id, return 0
-        return 0
-
     def get_doc_weights(self) -> dict[int, float]:
         """Loads the document weights (Euclidean lengths) from the specified file."""
         doc_weights = {}
@@ -138,20 +115,6 @@ class DiskPositionalIndex:
         except FileNotFoundError:
             print(f"File not found: {DOC_WEIGHTS_FILE_PATH}")
             return {}
-
-    def calculate_average_document_length(self):
-        """Calculates the average document length for the corpus."""
-        doc_weights = self.get_doc_weights()
-        if not doc_weights:
-            return 0
-        total_length = sum(doc_weights.values())
-        return total_length / self.total_docs if self.total_docs > 0 else 0
-    
-    def get_total_docs(self):
-        """Retrieve the total number of documents in the index."""
-        self.db_cursor.execute("SELECT COUNT(*) FROM document_metadata")
-        result = self.db_cursor.fetchone()
-        return result[0] if result else 0
 
     def close(self):
         self.db_conn.close()

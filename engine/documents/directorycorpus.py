@@ -41,7 +41,6 @@ class DirectoryCorpus:
         )
         self.factories.update(default_factories)
         self._documents: Dict[int, Document] = {}
-        self._read_documents()
 
     def documents(self) -> Iterable[Document]:
         """Return an iterable over all Document instances in the corpus."""
@@ -62,24 +61,19 @@ class DirectoryCorpus:
         """Return a Document instance by its ID."""
         return self._documents.get(docID, None)
 
-    def _read_documents(self) -> None:
-        """Read documents from the directory and populate the _documents attribute."""
+    def load_documents_generator(self) -> Iterable[Document]:
+        """Generator method to yield documents one by one from the directory."""
         next_id = 0
         for f in Path(self.corpus_path).rglob("*"):
             if f.suffix in self.factories and self.file_filter(f):
                 if f.suffix == ".json":
-                    # Handle JSON files differently since they need more arguments.
                     with open(f, "r", encoding="utf-8") as json_file:
                         data = json.load(json_file)
                     title = data.get("title", "")
                     content = data.get("body", "")
-                    # Call without keyword arguments
-                    self._documents[next_id] = self.factories[f.suffix](
-                        next_id, title, content
-                    )
+                    yield self.factories[f.suffix](next_id, title, content)
                 else:
-                    # For other file types
-                    self._documents[next_id] = self.factories[f.suffix](f, next_id)
+                    yield self.factories[f.suffix](f, next_id)
                 next_id += 1
         global TOTAL_DOCS
         TOTAL_DOCS = next_id

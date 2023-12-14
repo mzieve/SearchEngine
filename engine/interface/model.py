@@ -1,6 +1,5 @@
 from engine.indexing import (
     PositionalInvertedIndex,
-    DiskIndexWriter,
     DiskPositionalIndex,
     SPIMI
 )
@@ -43,39 +42,13 @@ class CorpusManager:
             ".json": JsonDocument.load_from,
             ".xml": XMLDocument.load_from,
         }
-        self.corpus = DirectoryCorpus.load_directory(
-            folder_selected, extension_factories
-        )
-        return self.corpus
+        self.corpus = DirectoryCorpus(folder_selected, factories=extension_factories)
 
     def index_corpus(self, progress_callback=None):
         """Index the corpus using SPIMI."""
-        first_doc_content = self.corpus[0].get_content()
-        lang_content = (
-            first_doc_content.read()
-            if isinstance(first_doc_content, io.TextIOWrapper)
-            else " ".join(first_doc_content)
-        )
-        language = self.preprocess.detect_language(lang_content)
-        config.LANGUAGE = language
-
-        # Write language to file
-        language_file_path = os.path.join(DATA_DIR, "language.json")
-        with open(language_file_path, "w") as language_file:
-            json.dump({"language": language}, language_file)
-
-        # Processing SPIMI
-        spimi = SPIMI(BUCKET_DIR, self.corpus)
+        # Initialize SPIMI with the DirectoryCorpus instance
+        spimi = SPIMI(DB_PATH, BUCKET_DIR, self.corpus)
         spimi.spimi_index(progress_callback=progress_callback)
-
-        # Process Merged Files
-        merged_postings_file = os.path.join(BUCKET_DIR, "merged_postings.txt")
-        memory_index = self.preprocess.process_merged(merged_postings_file)
-
-        # Write to Disk
-        disk_index_writer = DiskIndexWriter(DB_PATH, memory_index)
-        disk_index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
-        disk_index_writer.close()
 
         # Initialize the disk index
         if self.search_manager:
@@ -321,10 +294,14 @@ class UIManager:
         self.progress_info_label.grid_forget()
         self.progress_frame.grid_forget()
 
-    def update_progress_ui(self, current_document_index, total_documents):
+    def update_progress_ui(self, progress_fraction):
         """Update the progress UI based on the indexed documents."""
-        progress_fraction = (current_document_index + 1) / total_documents
+        # Ensure progress_fraction does not exceed 1.0
+        progress_fraction = min(progress_fraction, 1.0)
+
+        # Update the progress bar with this fraction
         self.master.after(0, self._update_progress_ui_on_main_thread, progress_fraction)
+
 
     def _update_progress_ui_on_main_thread(self, progress_fraction):
         """Update the progress UI on the main thread."""
