@@ -14,8 +14,6 @@ class DiskPositionalIndex:
         self.db_cursor = self.db_conn.cursor()
         self.term_start_positions = self._start_positions()
         self.is_phrase_query = False 
-        self.total_docs = self.get_total_docs()
-        self.avg_doc_length = self.calculate_average_document_length() if self.total_docs > 0 else 0
 
     def set_phrase_query(self, is_phrase_query):
         """Sets the flag indicating whether the current query is a phrase query."""
@@ -98,31 +96,9 @@ class DiskPositionalIndex:
 
         return postings
 
-    def get_term_frequency(self, term: str, doc_id: int) -> int:
-        """Retrieves the term frequency (tf) for a specific term in a specific document."""
-        start_position = self._start_position(term)
-        if start_position is None:
-            return 0
-
-        with open(self.postings_file_path, "rb") as postings_file:
-            postings_file.seek(start_position)
-            dft = struct.unpack("I", postings_file.read(4))[0]
-            last_doc_id = 0
-            for _ in range(dft):
-                doc_gap = struct.unpack("I", postings_file.read(4))[0]
-                current_doc_id = last_doc_id + doc_gap
-                tftd = struct.unpack("I", postings_file.read(4))[0]
-                # If the current doc_id is the one we're looking for, return its tf
-                if current_doc_id == doc_id:
-                    return tftd
-                # Skip the positions data for this document
-                postings_file.seek(tftd * 4, os.SEEK_CUR)
-                last_doc_id = current_doc_id
-        # If we've gone through all postings and haven't found the doc_id, return 0
-        return 0
-
     def get_doc_weights(self) -> dict[int, float]:
         """Loads the document weights (Euclidean lengths) from the specified file."""
+        print("Fetching Doc Weights")
         doc_weights = {}
         try:
             with open(DOC_WEIGHTS_FILE_PATH, 'rb') as doc_weights_file:
@@ -138,20 +114,22 @@ class DiskPositionalIndex:
         except FileNotFoundError:
             print(f"File not found: {DOC_WEIGHTS_FILE_PATH}")
             return {}
-
-    def calculate_average_document_length(self):
-        """Calculates the average document length for the corpus."""
-        doc_weights = self.get_doc_weights()
-        if not doc_weights:
-            return 0
-        total_length = sum(doc_weights.values())
-        return total_length / self.total_docs if self.total_docs > 0 else 0
-    
-    def get_total_docs(self):
-        """Retrieve the total number of documents in the index."""
-        self.db_cursor.execute("SELECT COUNT(*) FROM document_metadata")
+        
+    def get_document_length(self, doc_id):
+        self.db_cursor.execute('SELECT doc_length FROM document_metadata WHERE doc_id = ?', (doc_id,))
         result = self.db_cursor.fetchone()
-        return result[0] if result else 0
+        return result[0] if result else None
+    
+    def calculate_average_doc_length(self):
+        self.db_cursor.execute('SELECT COUNT(*) FROM document_metadata')
+        num_documents = self.db_cursor.fetchone()[0]
+        if num_documents == 0:
+            return 0  # Avoid division by zero
+
+        self.db_cursor.execute('SELECT value FROM corpus_stats WHERE stat_name = "total_tokens"')
+        total_tokens = self.db_cursor.fetchone()[0]
+
+        return total_tokens / num_documents
 
     def close(self):
         self.db_conn.close()

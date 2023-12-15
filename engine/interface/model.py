@@ -1,12 +1,11 @@
 from engine.indexing import (
     PositionalInvertedIndex,
-    DiskIndexWriter,
     DiskPositionalIndex,
+    SPIMI
 )
 from config import (
     DB_PATH,
     POSTINGS_FILE_PATH,
-    DOC_WEIGHTS_FILE_PATH,
     DATA_DIR,
     BUCKET_DIR,
 )
@@ -15,7 +14,6 @@ from tkinter import filedialog
 import customtkinter  # type: ignore
 from .decorators import threaded
 import traceback
-import io
 import config
 import os
 import json
@@ -25,7 +23,6 @@ from engine.documents import (
     TextFileDocument,
     JsonDocument,
     XMLDocument,
-    SPIMI,
 )
 
 
@@ -43,39 +40,13 @@ class CorpusManager:
             ".json": JsonDocument.load_from,
             ".xml": XMLDocument.load_from,
         }
-        self.corpus = DirectoryCorpus.load_directory(
-            folder_selected, extension_factories
-        )
-        return self.corpus
+        self.corpus = DirectoryCorpus(folder_selected, factories=extension_factories)
 
     def index_corpus(self, progress_callback=None):
         """Index the corpus using SPIMI."""
-        first_doc_content = self.corpus[0].get_content()
-        lang_content = (
-            first_doc_content.read()
-            if isinstance(first_doc_content, io.TextIOWrapper)
-            else " ".join(first_doc_content)
-        )
-        language = self.preprocess.detect_language(lang_content)
-        config.LANGUAGE = language
-
-        # Write language to file
-        language_file_path = os.path.join(DATA_DIR, "language.json")
-        with open(language_file_path, "w") as language_file:
-            json.dump({"language": language}, language_file)
-
-        # Processing SPIMI
-        spimi = SPIMI(BUCKET_DIR, self.corpus)
+        # Initialize SPIMI with the DirectoryCorpus instance
+        spimi = SPIMI(DB_PATH, BUCKET_DIR, self.corpus)
         spimi.spimi_index(progress_callback=progress_callback)
-
-        # Process Merged Files
-        merged_postings_file = os.path.join(BUCKET_DIR, "merged_postings.txt")
-        memory_index = self.preprocess.process_merged(merged_postings_file)
-
-        # Write to Disk
-        disk_index_writer = DiskIndexWriter(DB_PATH, memory_index)
-        disk_index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
-        disk_index_writer.close()
 
         # Initialize the disk index
         if self.search_manager:
@@ -135,7 +106,7 @@ class SearchManager:
                 print(f"Error loading disk index: {e}")
             return None
 
-    def perform_search(self):
+    def perform_search(self, ranked_search_enabled=False):
         """Perform the search operation."""
         self.corpus_manager.load_language_setting()
 
@@ -148,10 +119,12 @@ class SearchManager:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
 
+        """
         if not self.disk_index.getPostings(raw_query):
             corrected_query = self.spelling_correction.suggest_corrections(raw_query)
             if corrected_query:
                 print(f"Did you mean: {corrected_query}?")
+        """
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()
@@ -165,9 +138,10 @@ class SearchManager:
                 self.view.pages["ResultsPage"].display_no_results_warning(raw_query)
                 return
             
-            ranked_postings = self.ranked_query_processor.rank_documents(query, postings)
+            use_okapi = self.view.pages["ResultsPage"].okapi_var.get()
+            results = self.ranked_query_processor.rank_documents(query, postings, use_okapi)
 
-            self._display_search_results(ranked_postings)
+            self._display_search_results(results)
 
         except Exception as e:
             self._handle_search_error(e)
@@ -218,19 +192,28 @@ class SearchManager:
 
         return postings
 
-    def _display_search_results(self, ranked_postings):
+    def _display_search_results(self, results):
         """Display the search results on the ResultsPage."""
-        results = len(ranked_postings)
-        self.view.pages["ResultsPage"].results_frame.update_results_count(results)
+        results_count = len(results)
+        self.view.pages["ResultsPage"].results_frame.update_results_count(results_count)
 
-        # Format data items to include the score
-        data_items = [
-            f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
-            for doc_id, score in ranked_postings
-        ]
+        # Check if the results are ranked (contain scores) or not
+        if results and isinstance(results[0], tuple):
+            # Handle ranked postings (doc_id, score)
+            data_items = [
+                f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
+                for doc_id, score in results
+            ]
+        else:
+            # Handle regular postings (just Posting objects)
+            data_items = [
+                f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}"
+                for posting in results
+            ]
 
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
+
 
     def get_document_title(self, doc_id):
         """Retrieve the title of a document based on its document ID."""
@@ -311,10 +294,14 @@ class UIManager:
         self.progress_info_label.grid_forget()
         self.progress_frame.grid_forget()
 
-    def update_progress_ui(self, current_document_index, total_documents):
+    def update_progress_ui(self, progress_fraction):
         """Update the progress UI based on the indexed documents."""
-        progress_fraction = (current_document_index + 1) / total_documents
+        # Ensure progress_fraction does not exceed 1.0
+        progress_fraction = min(progress_fraction, 1.0)
+
+        # Update the progress bar with this fraction
         self.master.after(0, self._update_progress_ui_on_main_thread, progress_fraction)
+
 
     def _update_progress_ui_on_main_thread(self, progress_fraction):
         """Update the progress UI on the main thread."""
@@ -322,9 +309,9 @@ class UIManager:
         self.progress.set(progress_fraction)
         self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
 
-    def perform_search_ui(self):
-        # UI interactions for the search operation run in a new thread
-        self.search_manager.perform_search()
+    def perform_search_ui(self, ranked_search_enabled=False):
+        # Pass the ranked_search_enabled parameter to perform_search
+        self.search_manager.perform_search(ranked_search_enabled)
 
     def show_warning(self, message):
         self.view.pages["HomePage"].home_warning_label.configure(text=message)

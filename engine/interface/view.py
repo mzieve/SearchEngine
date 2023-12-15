@@ -1,10 +1,6 @@
-from tkinter import filedialog, Label, ttk
-import tkinter.font as font
 from PIL import Image, ImageSequence
 import customtkinter  # type: ignore
-from customtkinter import CTkScrollableFrame
 from itertools import cycle
-import tkinter as tk
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
@@ -165,9 +161,10 @@ class ResultsPage(customtkinter.CTkFrame):
         self.controller = controller
         self.displayed_results = []
         self.results_count_label = None
+        self.okapi_var = customtkinter.BooleanVar(value=False)
 
         self.top_frame = customtkinter.CTkFrame(self)
-        self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
+        self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=3)
 
         # Configure the row and column weights
         self.rowconfigure(0, weight=0)
@@ -178,6 +175,7 @@ class ResultsPage(customtkinter.CTkFrame):
         # Configure the row and column weights for top frame
         self.top_frame.columnconfigure(0, weight=0)
         self.top_frame.columnconfigure(1, weight=1)
+        self.top_frame.columnconfigure(2, weight=2)
         self.top_frame.rowconfigure(0, weight=1)
 
         self.results_search_entry = None
@@ -219,9 +217,26 @@ class ResultsPage(customtkinter.CTkFrame):
             )
         else:
             self.results_search_entry.delete(0, "end")
+        
+        okmapi = customtkinter.CTkCheckBox(
+            self.top_frame,
+            text="Okapi",
+            checkbox_width=20,
+            checkbox_height=20,
+            corner_radius=1,
+            border_width=1,
+            variable=self.okapi_var, 
+            onvalue=True,
+            offvalue=False,
+            command=self._okapi_checkbox_callback
+        )
 
         self.results_search_entry.insert(0, query)
         logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
+        okmapi.grid(row=0, column=2, sticky="e", padx=(45, 50), pady=25)
+    
+    def _okapi_checkbox_callback(self):
+        okapi_checked = self.okapi_var.get()
 
     def display_no_results_warning(self, query, error_message=None):
         """Display the no results message inside the results frame."""

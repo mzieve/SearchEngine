@@ -26,8 +26,11 @@ class BasicTokenProcessor(TokenProcessor):
             tok = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", tok)
             # Remove apostrophes, quotation marks, and all spaces
             tok = re.sub(r"[\"' ]", "", tok)
+            # Remove all non-ASCII characters
+            tok = re.sub(r"[^\x00-\x7F]+", "", tok)
             # Convert to lowercase
             tok = tok.lower()
+
             cleaned_types.append(tok)
 
         return cleaned_types
