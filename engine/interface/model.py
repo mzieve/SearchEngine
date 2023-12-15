@@ -118,6 +118,13 @@ class SearchManager:
         if not raw_query:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
+        
+        """
+        if not self.disk_index.getPostings(raw_query):
+            corrected_query = self.spelling_correction.suggest_corrections(raw_query)
+            if corrected_query:
+                print(f"Did you mean: {corrected_query}?")
+        """
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()
