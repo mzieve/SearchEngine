@@ -1,5 +1,5 @@
-from . import AndQuery, OrQuery, QueryComponent, TermLiteral, PhraseLiteral, NotQuery
 from engine.text import Preprocessing
+from . import AndQuery, OrQuery, QueryComponent, TermLiteral, PhraseLiteral, NotQuery
 
 
 class BooleanQueryParser:

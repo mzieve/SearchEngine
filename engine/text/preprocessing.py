@@ -1,95 +1,27 @@
-import struct
-
 from engine.text import (
     BasicTokenProcessor,
     SpanishTokenProcessor,
     EnglishTokenStream,
     SpanishTokenStream,
 )
-from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
+from engine.indexing import Index, PositionalInvertedIndex
 from langdetect import detect  # type: ignore
-from math import sqrt
 import config
 import spacy
-import os
 
 
 class Preprocessing:
     def __init__(self, text=None):
         self.text = text
-        self.p_i_index = PositionalInvertedIndex()
         self.nlp = spacy.load("es_core_news_sm")
-        #Used a relative path so that this file and project can work on any computer.
-        proj_path = os.path.abspath(".")
-        self.on_disk_index_path = os.path.join(proj_path, "SearchEngine\data")
-        #self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
-        #self.d_i_index = DiskPositionalIndex(self.on_disk_index_path, self.on_disk_index_path)
+        self.p_i_index = PositionalInvertedIndex()
+        self.eng_processor = BasicTokenProcessor()
+        #self.eng_processor = SpanishTokenProcessor()
 
     def detect_language(self, text):
         """Detects the language of the provided text."""
         detected_lang = detect(text)
         return {"en": "english", "es": "spanish"}.get(detected_lang, "english")
-
-    def dic_process_position(self, corpus, progress_callback=None):
-        """Position each document based on the detected language"""
-        eng_processor = BasicTokenProcessor()
-        es_processor = SpanishTokenProcessor()
-        data_folder_name = corpus.corpus_path.split("/")[-1]
-        data_folder_path = os.path.join(self.on_disk_index_path, data_folder_name)
-        try:
-            os.makedirs(data_folder_path)
-            self.on_disk_index_path = data_folder_path
-            self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
-            self.d_i_index = DiskPositionalIndex(self.on_disk_index_path)
-            doc_Weights_file_path = os.path.join(self.on_disk_index_path, "docWeights.bin")
-            doc_Weights_file = open(doc_Weights_file_path, "wb")
-            # Does this loop go through the docs in Doc ID order?
-            for i, doc_path in enumerate(corpus):
-                # For each doc:
-                if config.LANGUAGE == "english":
-                    tokens = EnglishTokenStream(doc_path.get_content())
-                    processor = eng_processor
-                elif config.LANGUAGE == "spanish":
-                    tokens = SpanishTokenStream(doc_path.get_content(), nlp=self.nlp)
-                    processor = es_processor
-
-                position = 0
-                # Record tftd values for each term in this document.
-                tftd = dict()
-                for token in tokens:
-                    position += 1
-                    tok_types = processor.process_token(token)
-
-                    for tok_type in tok_types:
-                        term = processor.normalize_type(tok_type)
-                        self.p_i_index.addTerm(term, doc_path.id, position)
-                        if term not in tftd:
-                            tftd[term] = 1
-                        else:
-                            tftd[term] += 1
-                tftd_sq_sum = 0
-                for term, freq in tftd.items():
-                    tftd_sq_sum += freq ** 2
-                euc_len = float(sqrt(tftd_sq_sum))
-                packed_euc_len = struct.pack("f", euc_len)
-                doc_Weights_file.write(packed_euc_len)
-                # After processing each document, update the progress.
-                if progress_callback:
-                    progress_callback(i + 1)
-            doc_Weights_file.close()
-            # get the current working directory
-            # cwd = os.getcwd()
-
-            # The positional inverted index has all the info we need. Write it to disk.
-            self.d_i_writer.writeIndex(self.p_i_index, self.on_disk_index_path)
-        except OSError as error:
-            #Index folder with data already exists, so skip indexing altogether.
-            #Positional Index has all the terms as well, so just return its vocabulary.
-            self.on_disk_index_path = data_folder_path
-            self.d_i_writer = DiskIndexWriter(self.on_disk_index_path)
-            self.d_i_index = DiskPositionalIndex(self.on_disk_index_path)
-        finally:
-            return self.p_i_index.getVocabulary()
 
     def process(self, query):
         """Processes the text based on its detected language."""
@@ -129,3 +61,38 @@ class Preprocessing:
                 processed_query.append(term)
 
         return " ".join(processed_query)
+
+    def dic_process_position(self, document, progress_callback=None):
+        """Yield each token with its position from the document."""
+
+        tokens = EnglishTokenStream(document.get_content())
+
+        position = 0
+        for token in tokens:
+            position += 1
+            tok_types = self.eng_processor.process_token(token)
+
+            for tok_type in tok_types:
+                term = self.eng_processor.normalize_type(tok_type)
+                yield (term, document.id, position)
+
+            if progress_callback:
+                progress_callback()
+
+    def process_merged(self, file_path):
+        """Reconstructs the index from a merged postings file."""
+        with open(file_path, 'r', encoding='utf-8') as file:
+            for line in file:
+                term, postings_str = line.strip().split(": ")
+                postings_list = postings_str.split(";")
+                for posting_str in postings_list:
+                    doc_id, positions_str = posting_str.split("[", 1)  
+                    doc_id = doc_id.strip(",")  
+                    positions_str = positions_str.strip(']') 
+                    positions_str = positions_str.replace("'", "") 
+                    positions = list(map(int, positions_str.split(','))) 
+
+                    for position in positions:
+                        self.p_i_index.addTerm(term, int(doc_id), position)
+
+        return self.p_i_index

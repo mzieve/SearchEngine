@@ -25,7 +25,7 @@ def threaded_value(func):
 
         thread = threading.Thread(target=inner_func, args=args, kwargs=kwargs)
         thread.start()
-        thread.join()  # Wait for the thread to complete
-        return q.get()  # Retrieve the result
+        thread.join()  
+        return q.get()  
 
     return wrapper

@@ -1,7 +1,18 @@
+# Python related files
 __pycache__/
 *.pyc
-.pytest_cache/
-venv/
-.DS_Storeß
 .mypy_cache
+.pytest_cache/
+
+# Virtual environment
+venv/
+
+# MacOS specific
+.DS_Store
+
+# Binary and data files specific to this project
 *.bin
+postings.bin
+index.db
+language.json
+bucket/

@@ -16,7 +16,8 @@ class TextFileDocument(Document):
 
     def get_content(self) -> Iterable[str]:
         """Yield the content of the document as an iterable."""
-        return open(self.path)
+        with open(self.path, 'r', encoding='utf-8') as file:
+            yield from file
 
     @staticmethod
     def load_from(abs_path: Path, doc_id: int) -> "TextFileDocument":
