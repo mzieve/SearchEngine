@@ -161,6 +161,7 @@ class ResultsPage(customtkinter.CTkFrame):
         self.controller = controller
         self.displayed_results = []
         self.results_count_label = None
+        self.ranked_var = customtkinter.BooleanVar(value=False)
         self.okapi_var = customtkinter.BooleanVar(value=False)
 
         self.top_frame = customtkinter.CTkFrame(self)
@@ -171,11 +172,14 @@ class ResultsPage(customtkinter.CTkFrame):
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
+        self.columnconfigure(2, weight=0)
+        self.columnconfigure(3, weight=0)
 
         # Configure the row and column weights for top frame
         self.top_frame.columnconfigure(0, weight=0)
         self.top_frame.columnconfigure(1, weight=1)
-        self.top_frame.columnconfigure(2, weight=2)
+        self.top_frame.columnconfigure(2, weight=1)
+        self.top_frame.columnconfigure(3, weight=1)
         self.top_frame.rowconfigure(0, weight=1)
 
         self.results_search_entry = None
@@ -183,7 +187,7 @@ class ResultsPage(customtkinter.CTkFrame):
         # Add result frame to canvas
         self.results_frame = LazyLoading(self, [])
         self.results_frame.grid(
-            row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
+            row=1, column=0, sticky="nsew", columnspan=3, pady=(5, 0)
         )
 
         # Label for displaying the number of results
@@ -200,6 +204,7 @@ class ResultsPage(customtkinter.CTkFrame):
             pady=10,
             text_color="white",
         )
+        logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
 
         if not self.results_search_entry:
             self.results_search_entry = customtkinter.CTkEntry(
@@ -218,25 +223,49 @@ class ResultsPage(customtkinter.CTkFrame):
         else:
             self.results_search_entry.delete(0, "end")
         
-        okmapi = customtkinter.CTkCheckBox(
+        # Initialize the ranked checkbox
+        self.ranked = customtkinter.CTkCheckBox(
+            self.top_frame,
+            text="Ranked",
+            checkbox_width=20,
+            checkbox_height=20,
+            corner_radius=1,
+            border_width=1,
+            variable=self.ranked_var, 
+            command=self._ranked_checkbox_callback
+        )
+        self.ranked.grid(row=0, column=2, sticky="w", padx=(35, 15), pady=25)
+
+        # Initialize the Okapi checkbox, initially disabled
+        self.okmapi = customtkinter.CTkCheckBox(
             self.top_frame,
             text="Okapi",
             checkbox_width=20,
             checkbox_height=20,
             corner_radius=1,
             border_width=1,
-            variable=self.okapi_var, 
-            onvalue=True,
-            offvalue=False,
-            command=self._okapi_checkbox_callback
+            variable=self.okapi_var,
+            command=self._okapi_checkbox_callback,
         )
+        self.okmapi.grid(row=0, column=3, sticky="w", padx=(5, 5), pady=25)
 
         self.results_search_entry.insert(0, query)
-        logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
-        okmapi.grid(row=0, column=2, sticky="e", padx=(45, 50), pady=25)
     
+    def _ranked_checkbox_callback(self):
+        ranked_checked = self.ranked_var.get()
+        if ranked_checked:
+            self.okmapi.configure(state="disabled")
+        else:
+            self.okmapi.configure(state="normal")
+            self.okapi_var.set(False)
+
     def _okapi_checkbox_callback(self):
         okapi_checked = self.okapi_var.get()
+        if okapi_checked:
+            self.ranked.configure(state="disabled")
+        else:
+            self.ranked.configure(state="normal")
+            self.ranked_var.set(False)
 
     def display_no_results_warning(self, query, error_message=None):
         """Display the no results message inside the results frame."""
@@ -337,7 +366,7 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
         parts = data.split(" - ")
         doc_id_str = parts[0].replace("Document ID# ", "")
         doc_title = parts[1]
-        score_str = parts[2]  # Assuming the score is the third part
+        score_str = parts[2] if len(parts) > 2 else None  
 
         doc_id = int(doc_id_str)
 
@@ -350,13 +379,18 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
             font=("Helvetica", 11),
         ).grid(row=0, column=0, sticky="w")
 
-        customtkinter.CTkLabel(
-            result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
-        ).grid(row=1, column=0, sticky="w")
-
-        customtkinter.CTkLabel(
-            result_frame, text=score_str, font=("Helvetica", 11)
-        ).grid(row=2, column=0, sticky="w", pady=(0, 25))
+        if score_str:
+            customtkinter.CTkLabel(
+                result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
+            ).grid(row=1, column=0, sticky="w")
+            
+            customtkinter.CTkLabel(
+                result_frame, text=f"Score: {score_str}", font=("Helvetica", 11)
+            ).grid(row=2, column=0, sticky="w", pady=(0, 25))
+        else:
+            customtkinter.CTkLabel(
+                result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
+            ).grid(row=1, column=0, sticky="w", pady=(0, 25))
 
         return result_frame
 

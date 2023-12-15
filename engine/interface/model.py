@@ -45,7 +45,7 @@ class CorpusManager:
     def index_corpus(self, progress_callback=None):
         """Index the corpus using SPIMI."""
         # Initialize SPIMI with the DirectoryCorpus instance
-        spimi = SPIMI(DB_PATH, BUCKET_DIR, self.corpus)
+        spimi = SPIMI(self.corpus)
         spimi.spimi_index(progress_callback=progress_callback)
 
         # Initialize the disk index
@@ -106,7 +106,7 @@ class SearchManager:
                 print(f"Error loading disk index: {e}")
             return None
 
-    def perform_search(self, ranked_search_enabled=False):
+    def perform_search(self):
         """Perform the search operation."""
         self.corpus_manager.load_language_setting()
 
@@ -119,29 +119,27 @@ class SearchManager:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
 
-        """
-        if not self.disk_index.getPostings(raw_query):
-            corrected_query = self.spelling_correction.suggest_corrections(raw_query)
-            if corrected_query:
-                print(f"Did you mean: {corrected_query}?")
-        """
-
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()
 
         try:
             query = BooleanQueryParser.parse_query(raw_query, self.preprocess)
 
-            postings = self._get_postings(query)
+            if self.view.pages["ResultsPage"].ranked_var.get() or self.view.pages["ResultsPage"].okapi_var.get():
+                use_okapi = self.view.pages["ResultsPage"].okapi_var.get()
+                results = self.ranked_query_processor.rank_documents(raw_query, use_okapi)
+            else:
+                postings = self._get_postings(query)
+                results = [(posting.doc_id, 0) for posting in postings] 
 
-            if not postings:
+            if not results:
                 self.view.pages["ResultsPage"].display_no_results_warning(raw_query)
                 return
-            
-            use_okapi = self.view.pages["ResultsPage"].okapi_var.get()
-            results = self.ranked_query_processor.rank_documents(query, postings, use_okapi)
 
             self._display_search_results(results)
+
+            self.view.pages["ResultsPage"].ranked_var.set(False)
+            self.view.pages["ResultsPage"].okapi_var.set(False)
 
         except Exception as e:
             self._handle_search_error(e)
@@ -197,19 +195,17 @@ class SearchManager:
         results_count = len(results)
         self.view.pages["ResultsPage"].results_frame.update_results_count(results_count)
 
-        # Check if the results are ranked (contain scores) or not
-        if results and isinstance(results[0], tuple):
-            # Handle ranked postings (doc_id, score)
-            data_items = [
-                f"Document ID# {doc_id} - {self.get_document_title(doc_id)} - Score: {score:.3f}"
-                for doc_id, score in results
-            ]
-        else:
-            # Handle regular postings (just Posting objects)
-            data_items = [
-                f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}"
-                for posting in results
-            ]
+        data_items = []
+        for result in results:
+            doc_id, score = result
+            doc_title = self.get_document_title(doc_id)
+            if score > 0:
+                # Handle ranked postings (doc_id, score)
+                data_item = f"Document ID# {doc_id} - {doc_title} - Score: {score:.3f}"
+            else:
+                # Handle regular postings (just Posting objects)
+                data_item = f"Document ID# {doc_id} - {doc_title}"
+            data_items.append(data_item)
 
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
@@ -309,9 +305,9 @@ class UIManager:
         self.progress.set(progress_fraction)
         self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
 
-    def perform_search_ui(self, ranked_search_enabled=False):
+    def perform_search_ui(self):
         # Pass the ranked_search_enabled parameter to perform_search
-        self.search_manager.perform_search(ranked_search_enabled)
+        self.search_manager.perform_search()
 
     def show_warning(self, message):
         self.view.pages["HomePage"].home_warning_label.configure(text=message)
