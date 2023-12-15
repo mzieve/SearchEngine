@@ -1,12 +1,9 @@
-import nltk
-nltk.download('words')
-from nltk.corpus import words
 import re
 
 class SpellingCorrection:
     def __init__(self, index):
         self.index = index
-        self.dictionary = set(words.words())
+        self.dictionary = set(self.index.getVocabulary())
 
     def levenshtein_distance(self, s1, s2):
         if len(s1) < len(s2):

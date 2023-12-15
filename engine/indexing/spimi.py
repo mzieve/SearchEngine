@@ -1,6 +1,6 @@
 from engine.indexing import PositionalInvertedIndex
 from engine.text import Preprocessing
-from config import WEIGHTS_DIR
+from config import WEIGHTS_DIR, BUCKET_DIR, DB_PATH, POSTINGS_DIR
 import struct
 import sqlite3
 import math
@@ -17,10 +17,10 @@ class Posting:
 
 
 class SPIMI:
-    def __init__(self, db_path, bucket_dir, corpus):
+    def __init__(self, corpus):
         """Initialize the DiskIndexWriter with the specified database path and in-memory index."""
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.db_conn = sqlite3.connect(db_path)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        self.db_conn = sqlite3.connect(DB_PATH)
         self.db_cursor = self.db_conn.cursor()
         self.db_cursor.execute('''
             CREATE TABLE IF NOT EXISTS term_positions (
@@ -40,8 +40,7 @@ class SPIMI:
             )''')
         self.db_conn.commit()
 
-        self.bucket_dir = bucket_dir
-        os.makedirs(self.bucket_dir, exist_ok=True)
+        os.makedirs(BUCKET_DIR, exist_ok=True)
         self.preprocessing = Preprocessing()
         self.p_i_index = PositionalInvertedIndex()
         self.corpus = corpus
@@ -50,59 +49,58 @@ class SPIMI:
         self.uniq_terms = 0
 
     def batch_insert_document_metadata(self, documents):
-        # 'documents' is a list of tuples (doc_id, title)
-        self.db_cursor.executemany('INSERT INTO document_metadata (doc_id, title) VALUES (?, ?)', documents)
+        # 'documents' is now a list of tuples (doc_id, title, doc_length)
+        self.db_cursor.executemany('INSERT INTO document_metadata (doc_id, title, doc_length) VALUES (?, ?, ?)', documents)
         self.db_conn.commit()
 
     def spimi_index(self, progress_callback=None):
         """Creates the positional inverted index using SPIMI."""
+        print("SPIMI indexing...")
         total_memory = 0
         num_docs = 36803
 
-        # Insert document metadata into the database
         document_metadata = []
-        for doc_id, document in enumerate(self.corpus.documents()):
-            document_metadata.append((doc_id, document.title))
-            if len(document_metadata) >= 1000: 
-                self.batch_insert_document_metadata(document_metadata)
-                document_metadata = []
-
-        # Insert any remaining documents
-        if document_metadata:
-            self.batch_insert_document_metadata(document_metadata)
-
         doc_term_freq = {}
         total_tokens = 0
 
-        # Iterate through each document in the corpus
+        # Single loop for indexing and metadata handling
         for i, document in enumerate(self.corpus.load_documents_generator()):
-            doc_id = document.id  
-            doc_term_freq[doc_id] = {}
+            doc_id = document.id
             doc_length = 0
+            doc_term_freq[doc_id] = {}
 
-            total_memory += 4
-            for term, doc_id, position in self.preprocessing.dic_process_position(document):
+            # Process each term in the document
+            for term, _, position in self.preprocessing.dic_process_position(document):
                 self.p_i_index.addTerm(term, doc_id, position)
                 total_memory += 5
                 doc_term_freq[doc_id][term] = doc_term_freq[doc_id].get(term, 0) + 1
                 doc_length += 1
 
-                # If memory limit is reached, write the in-memory index to disk
+                # Check memory limit
                 if self.memory_limit(total_memory):
-                    print(f"Memory limit reached. Current Memory Usage: {total_memory}")
                     self.memory_index()
                     total_memory = 0
                     self.p_i_index.clear()
-            
-            # Update the document metadata with the document length
-            self.db_cursor.execute('INSERT INTO document_metadata (doc_id, title, doc_length) VALUES (?, ?, ?)', (doc_id, document.title, doc_length))
-            self.db_conn.commit()
+
+            # Accumulate document metadata
+            document_metadata.append((doc_id, document.title, doc_length))
+
+            # Batch insert metadata if threshold reached
+            if len(document_metadata) >= 1000:
+                self.batch_insert_document_metadata(document_metadata)
+                document_metadata = []
+
             total_tokens += doc_length
 
+            # Progress callback handling
             if progress_callback:
                 progress_fraction = 0.50 * (i + 1) / num_docs
                 progress_callback(progress_fraction)
-        
+
+        # Insert any remaining metadata after the loop
+        if document_metadata:
+            self.batch_insert_document_metadata(document_metadata)
+
         # Update the corpus stats with the total number of tokens
         self.db_cursor.execute('REPLACE INTO corpus_stats (stat_name, value) VALUES ("total_tokens", ?)', (total_tokens,))
         self.db_conn.commit()
@@ -112,22 +110,13 @@ class SPIMI:
 
         doc_squares_sum = {}
         for doc_id, terms in doc_term_freq.items():
-            # Print term frequencies for each document
-            print(f"Document ID: {doc_id}, Term Frequencies: {terms}")
-
             squares_sum = sum((1 + math.log(tf))**2 for tf in terms.values() if tf > 0)
             doc_squares_sum[doc_id] = squares_sum
-
-            # Print the sum of squares for each document
-            print(f"Document ID: {doc_id}, Sum of Squares: {squares_sum}")
 
         euclidean_lengths = {}
         for doc_id, squares_sum in doc_squares_sum.items():
             euclidean_length = math.sqrt(squares_sum)
             euclidean_lengths[doc_id] = euclidean_length
-
-            # Print the Euclidean length for each document
-            print(f"Document ID: {doc_id}, Euclidean Length: {euclidean_length}")
 
         os.makedirs(WEIGHTS_DIR, exist_ok=True)
         doc_weights_file_path = os.path.join(WEIGHTS_DIR, "docWeights.bin")
@@ -137,8 +126,7 @@ class SPIMI:
 
     def memory_index(self):
         """Sorts the in-memory index and writes it to disk."""
-        file_path = os.path.join(self.bucket_dir, f"bucket_{self.file_counter}.bin")
-        print(f"Creating file: {file_path}")
+        file_path = os.path.join(BUCKET_DIR, f"bucket_{self.file_counter}.bin")
         
         with open(file_path, "wb") as postings_file:
             sorted_terms = self.p_i_index.getVocabulary()
@@ -157,8 +145,6 @@ class SPIMI:
     def _encode_postings(self, term, postings_list):
         """Encodes the postings list using gap encoding."""
         # Encode the term length as an integer (4 bytes)
-        # print(term)
-
         term_bytes = b''.join([struct.pack('B', ord(character)) for character in term])
         term_length = len(term_bytes)
 
@@ -204,11 +190,13 @@ class SPIMI:
         print("Merging Files...")
         
         # Open read streams for each intermediate file
-        file_streams = [open(os.path.join(self.bucket_dir, f"bucket_{i}.bin"), "rb") for i in range(self.file_counter)]
+        file_streams = [open(os.path.join(BUCKET_DIR, f"bucket_{i}.bin"), "rb") for i in range(self.file_counter)]
+        
+        # Track whether a stream is exhausted
+        stream_exhausted = [False] * len(file_streams)
 
         # Open write stream for final merged file
-        start_positions = {}
-        merged_file_path = os.path.join(self.bucket_dir, "merged_index.bin")
+        merged_file_path = os.path.join(POSTINGS_DIR, "postings.bin")
         with open(merged_file_path, "wb") as merged_file:
 
             # Initialize priority queue
@@ -217,6 +205,10 @@ class SPIMI:
                 first_posting = self._read_postings_data(file_stream)
                 if first_posting:
                     heapq.heappush(pq, Posting(first_posting[0][0], index, first_posting))
+
+            # Initialize buffer for batch database updates
+            db_update_buffer = []
+            db_update_threshold = 1000  
 
             # Merge process
             processed_terms = 0
@@ -231,44 +223,58 @@ class SPIMI:
                     L.append(same_term_posting.postings_data)
 
                     # Get next posting from the same file
-                    next_posting = self._read_postings_data(file_streams[same_term_posting.file_index])
-                    if next_posting:
-                        heapq.heappush(pq, Posting(next_posting[0][0], same_term_posting.file_index, next_posting))
+                    if not stream_exhausted[same_term_posting.file_index]:
+                        next_posting = self._read_postings_data(file_streams[same_term_posting.file_index])
+                        if next_posting:
+                            heapq.heappush(pq, Posting(next_posting[0][0], same_term_posting.file_index, next_posting))
+                        else:
+                            stream_exhausted[same_term_posting.file_index] = True
 
                 # Merge L and write to file
                 merged_postings = self.merge_postings(L)
                 formatted_postings = [{'doc_id': posting[0], 'positions': posting[2]} for posting in merged_postings]
 
-                # print(f"Merging term: {current_term} with postings: {formatted_postings}")
-
                 # Record the start position
                 start_position = merged_file.tell()
-                self.db_cursor.execute('REPLACE INTO term_positions (term, position) VALUES (?, ?)', (current_term, start_position))
+                db_update_buffer.append((current_term, start_position))
 
+                # Write to file
                 encoded_data = self._encode_postings(current_term, formatted_postings)
                 merged_file.write(encoded_data)
 
                 # Push the next posting from the file we just processed to the priority queue
                 if not pq or pq[0].file_index != current_posting.file_index:
-                    next_posting = self._read_postings_data(file_streams[current_posting.file_index])
-                    if next_posting:
-                        heapq.heappush(pq, Posting(next_posting[0][0], current_posting.file_index, next_posting))
+                    if not stream_exhausted[current_posting.file_index]:
+                        next_posting = self._read_postings_data(file_streams[current_posting.file_index])
+                        if next_posting:
+                            heapq.heappush(pq, Posting(next_posting[0][0], current_posting.file_index, next_posting))
+                        else:
+                            stream_exhausted[current_posting.file_index] = True
 
                 processed_terms += 1
                 if progress_callback and total_terms:
                     progress_fraction = processed_terms / total_terms
                     progress_callback(progress_fraction)
 
-        self.db_conn.commit()
+                # Batch update to the database
+                if len(db_update_buffer) >= db_update_threshold:
+                    self.db_cursor.executemany('REPLACE INTO term_positions (term, position) VALUES (?, ?)', db_update_buffer)
+                    db_update_buffer = []
 
-        if progress_callback:
+            # Final database update for remaining items
+            if db_update_buffer:
+                self.db_cursor.executemany('REPLACE INTO term_positions (term, position) VALUES (?, ?)', db_update_buffer)
+            self.db_conn.commit()
+
+            if progress_callback:
                 progress_callback(1.0)
 
-        # Close all streams
-        for file_stream in file_streams:
-            file_stream.close()
+            # Close all streams
+            for file_stream in file_streams:
+                file_stream.close()
 
         print("Merging completed.")
+
 
     @staticmethod
     def merge_postings(postings_lists):
@@ -347,7 +353,7 @@ class SPIMI:
         return postings
 
     def memory_limit(self, total_memory):
-        MEMORY_LIMIT = 10000000 # 10 MB
+        MEMORY_LIMIT = 15000000 # 15 MB
         return total_memory > MEMORY_LIMIT
 
     def write_doc_weights(self, doc_lengths: dict[int, float], doc_weights_file_path: str):
