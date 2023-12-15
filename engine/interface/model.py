@@ -6,7 +6,6 @@ from engine.indexing import (
 from config import (
     DB_PATH,
     POSTINGS_FILE_PATH,
-    DOC_WEIGHTS_FILE_PATH,
     DATA_DIR,
     BUCKET_DIR,
 )
@@ -15,7 +14,6 @@ from tkinter import filedialog
 import customtkinter  # type: ignore
 from .decorators import threaded
 import traceback
-import io
 import config
 import os
 import json
@@ -121,10 +119,12 @@ class SearchManager:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
 
+        """
         if not self.disk_index.getPostings(raw_query):
             corrected_query = self.spelling_correction.suggest_corrections(raw_query)
             if corrected_query:
                 print(f"Did you mean: {corrected_query}?")
+        """
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()

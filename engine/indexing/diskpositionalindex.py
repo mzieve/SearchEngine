@@ -14,8 +14,6 @@ class DiskPositionalIndex:
         self.db_cursor = self.db_conn.cursor()
         self.term_start_positions = self._start_positions()
         self.is_phrase_query = False 
-        self.total_docs = self.get_total_docs()
-        self.avg_doc_length = self.calculate_average_document_length() if self.total_docs > 0 else 0
 
     def set_phrase_query(self, is_phrase_query):
         """Sets the flag indicating whether the current query is a phrase query."""
@@ -100,6 +98,7 @@ class DiskPositionalIndex:
 
     def get_doc_weights(self) -> dict[int, float]:
         """Loads the document weights (Euclidean lengths) from the specified file."""
+        print("Fetching Doc Weights")
         doc_weights = {}
         try:
             with open(DOC_WEIGHTS_FILE_PATH, 'rb') as doc_weights_file:
@@ -115,6 +114,22 @@ class DiskPositionalIndex:
         except FileNotFoundError:
             print(f"File not found: {DOC_WEIGHTS_FILE_PATH}")
             return {}
+        
+    def get_document_length(self, doc_id):
+        self.db_cursor.execute('SELECT doc_length FROM document_metadata WHERE doc_id = ?', (doc_id,))
+        result = self.db_cursor.fetchone()
+        return result[0] if result else None
+    
+    def calculate_average_doc_length(self):
+        self.db_cursor.execute('SELECT COUNT(*) FROM document_metadata')
+        num_documents = self.db_cursor.fetchone()[0]
+        if num_documents == 0:
+            return 0  # Avoid division by zero
+
+        self.db_cursor.execute('SELECT value FROM corpus_stats WHERE stat_name = "total_tokens"')
+        total_tokens = self.db_cursor.fetchone()[0]
+
+        return total_tokens / num_documents
 
     def close(self):
         self.db_conn.close()

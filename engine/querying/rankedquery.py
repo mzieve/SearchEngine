@@ -3,8 +3,6 @@ import math
 class RankedQuery:
     def __init__(self, index):
         self.index = index
-        self.total_docs = self.index.get_total_docs()
-        self.avg_doc_length = self.index.calculate_average_document_length()
         self.ld = self.index.get_doc_weights()
 
     def calculate_wqt(self, term, use_okapi):

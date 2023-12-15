@@ -30,43 +30,62 @@ class SPIMI:
         self.db_cursor.execute('''
             CREATE TABLE IF NOT EXISTS document_metadata (
                 doc_id INTEGER PRIMARY KEY,
-                title TEXT
+                title TEXT,
+                doc_length INTEGER
+            )''')
+        self.db_cursor.execute('''
+            CREATE TABLE IF NOT EXISTS corpus_stats (
+                stat_name TEXT PRIMARY KEY,
+                value INTEGER
             )''')
         self.db_conn.commit()
 
         self.bucket_dir = bucket_dir
+        os.makedirs(self.bucket_dir, exist_ok=True)
+        self.preprocessing = Preprocessing()
+        self.p_i_index = PositionalInvertedIndex()
         self.corpus = corpus
         self.in_memory_index = {}
         self.file_counter = 0
-        self.preprocessing = Preprocessing()
-        self.p_i_index = PositionalInvertedIndex()
         self.uniq_terms = 0
-        os.makedirs(self.bucket_dir, exist_ok=True)
+
+    def batch_insert_document_metadata(self, documents):
+        # 'documents' is a list of tuples (doc_id, title)
+        self.db_cursor.executemany('INSERT INTO document_metadata (doc_id, title) VALUES (?, ?)', documents)
+        self.db_conn.commit()
 
     def spimi_index(self, progress_callback=None):
         """Creates the positional inverted index using SPIMI."""
         total_memory = 0
         num_docs = 36803
 
+        # Insert document metadata into the database
+        document_metadata = []
         for doc_id, document in enumerate(self.corpus.documents()):
-            # Check if doc_id already exists in the document_metadata table
-            self.db_cursor.execute('SELECT doc_id FROM document_metadata WHERE doc_id = ?', (doc_id,))
-            if not self.db_cursor.fetchone():
-                # doc_id not found, so insert new record
-                self.db_cursor.execute('INSERT INTO document_metadata (doc_id, title) VALUES (?, ?)', (doc_id, document.title))
+            document_metadata.append((doc_id, document.title))
+            if len(document_metadata) >= 1000: 
+                self.batch_insert_document_metadata(document_metadata)
+                document_metadata = []
+
+        # Insert any remaining documents
+        if document_metadata:
+            self.batch_insert_document_metadata(document_metadata)
 
         doc_term_freq = {}
+        total_tokens = 0
 
         # Iterate through each document in the corpus
         for i, document in enumerate(self.corpus.load_documents_generator()):
             doc_id = document.id  
             doc_term_freq[doc_id] = {}
+            doc_length = 0
 
             total_memory += 4
             for term, doc_id, position in self.preprocessing.dic_process_position(document):
                 self.p_i_index.addTerm(term, doc_id, position)
                 total_memory += 5
                 doc_term_freq[doc_id][term] = doc_term_freq[doc_id].get(term, 0) + 1
+                doc_length += 1
 
                 # If memory limit is reached, write the in-memory index to disk
                 if self.memory_limit(total_memory):
@@ -74,19 +93,41 @@ class SPIMI:
                     self.memory_index()
                     total_memory = 0
                     self.p_i_index.clear()
+            
+            # Update the document metadata with the document length
+            self.db_cursor.execute('INSERT INTO document_metadata (doc_id, title, doc_length) VALUES (?, ?, ?)', (doc_id, document.title, doc_length))
+            self.db_conn.commit()
+            total_tokens += doc_length
 
             if progress_callback:
                 progress_fraction = 0.50 * (i + 1) / num_docs
                 progress_callback(progress_fraction)
+        
+        # Update the corpus stats with the total number of tokens
+        self.db_cursor.execute('REPLACE INTO corpus_stats (stat_name, value) VALUES ("total_tokens", ?)', (total_tokens,))
+        self.db_conn.commit()
 
         self.memory_index()
         self.merge_files(lambda fraction: progress_callback(0.50 + 0.50 * fraction), self.uniq_terms)
 
         doc_squares_sum = {}
         for doc_id, terms in doc_term_freq.items():
-            doc_squares_sum[doc_id] = sum((1 + math.log(tf)) for tf in terms.values() if tf > 0)
+            # Print term frequencies for each document
+            print(f"Document ID: {doc_id}, Term Frequencies: {terms}")
 
-        euclidean_lengths = {doc_id: math.sqrt(squares_sum) for doc_id, squares_sum in doc_squares_sum.items()}
+            squares_sum = sum((1 + math.log(tf))**2 for tf in terms.values() if tf > 0)
+            doc_squares_sum[doc_id] = squares_sum
+
+            # Print the sum of squares for each document
+            print(f"Document ID: {doc_id}, Sum of Squares: {squares_sum}")
+
+        euclidean_lengths = {}
+        for doc_id, squares_sum in doc_squares_sum.items():
+            euclidean_length = math.sqrt(squares_sum)
+            euclidean_lengths[doc_id] = euclidean_length
+
+            # Print the Euclidean length for each document
+            print(f"Document ID: {doc_id}, Euclidean Length: {euclidean_length}")
 
         os.makedirs(WEIGHTS_DIR, exist_ok=True)
         doc_weights_file_path = os.path.join(WEIGHTS_DIR, "docWeights.bin")
@@ -166,6 +207,7 @@ class SPIMI:
         file_streams = [open(os.path.join(self.bucket_dir, f"bucket_{i}.bin"), "rb") for i in range(self.file_counter)]
 
         # Open write stream for final merged file
+        start_positions = {}
         merged_file_path = os.path.join(self.bucket_dir, "merged_index.bin")
         with open(merged_file_path, "wb") as merged_file:
 
@@ -199,6 +241,10 @@ class SPIMI:
 
                 # print(f"Merging term: {current_term} with postings: {formatted_postings}")
 
+                # Record the start position
+                start_position = merged_file.tell()
+                self.db_cursor.execute('REPLACE INTO term_positions (term, position) VALUES (?, ?)', (current_term, start_position))
+
                 encoded_data = self._encode_postings(current_term, formatted_postings)
                 merged_file.write(encoded_data)
 
@@ -208,10 +254,12 @@ class SPIMI:
                     if next_posting:
                         heapq.heappush(pq, Posting(next_posting[0][0], current_posting.file_index, next_posting))
 
-            processed_terms += 1
-            if progress_callback and total_terms:
-                progress_fraction = processed_terms / total_terms
-                progress_callback(progress_fraction)
+                processed_terms += 1
+                if progress_callback and total_terms:
+                    progress_fraction = processed_terms / total_terms
+                    progress_callback(progress_fraction)
+
+        self.db_conn.commit()
 
         if progress_callback:
                 progress_callback(1.0)
@@ -308,5 +356,3 @@ class SPIMI:
             for doc_id in sorted(doc_lengths.keys()):
                 L_d = doc_lengths[doc_id]
                 doc_weights_file.write(struct.pack('d', L_d))
-            
-                print(f"Document ID: {doc_id}, L_d: {L_d}")
