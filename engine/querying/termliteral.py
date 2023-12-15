@@ -10,8 +10,8 @@ class TermLiteral(QueryComponent):
     def __init__(self, term: str):
         self.term = term
 
-    def getPostings(self, index, need_pos = False) -> list[Posting]:
-        return index.getPostings(self.term, need_pos)
+    def getPostings(self, index) -> list[Posting]:
+        return index.getPostings(self.term)
 
     def __str__(self) -> str:
         return self.term
