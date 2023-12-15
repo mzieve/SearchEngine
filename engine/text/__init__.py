@@ -3,3 +3,4 @@ from .basictokenprocessor import BasicTokenProcessor
 from .spanishtokenstream import SpanishTokenStream
 from .spanishtokenprocessor import SpanishTokenProcessor
 from .preprocessing import Preprocessing
+from .spellingcorrection import SpellingCorrection

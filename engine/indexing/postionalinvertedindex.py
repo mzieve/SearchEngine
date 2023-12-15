@@ -1,6 +1,7 @@
 from typing import Iterable
 from .postings import Posting
 from .index import Index
+import bisect
 
 
 class PositionalInvertedIndex(Index):
@@ -24,11 +25,21 @@ class PositionalInvertedIndex(Index):
 
     def addTerm(self, term: str, doc_id: int, position: int):
         """Records that the given document ID contains the given term at its current position."""
-        if term not in self.index:
-            self.index[term] = [Posting(doc_id, position)]
-        else:
-            latest_posting = self.index[term][-1]
-            if latest_posting.doc_id < doc_id:
-                self.index[term].append(Posting(doc_id, position))
-            elif latest_posting.doc_id == doc_id:
-                self.index[term][-1].positions.append(position)
+        if term:
+            if term not in self.index:
+                self.index[term] = [Posting(doc_id, [position])]
+            else:
+                postings_list = self.index[term]
+                if postings_list[-1].doc_id == doc_id:
+                    positions = postings_list[-1].positions
+                    if positions[-1] < position:
+                        positions.append(position)
+                    else:
+                        index = bisect.bisect_left(positions, position)
+                        positions.insert(index, position)
+                else:
+                    postings_list.append(Posting(doc_id, [position]))
+
+    def clear(self):
+        """Clears the index."""
+        self.index.clear()

@@ -4,6 +4,7 @@ import sqlite3
 import math
 import os
 
+
 class DiskIndexWriter:
     def __init__(self, db_path, index):
         """Initialize the DiskIndexWriter with the specified database path and in-memory index."""

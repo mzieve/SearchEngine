@@ -6,6 +6,6 @@ class Posting:
         if positions is None:
             self.positions = []
         elif isinstance(positions, int):
-            self.positions = [positions] 
+            self.positions = [positions]
         else:
             self.positions = positions

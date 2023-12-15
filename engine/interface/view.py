@@ -1,10 +1,6 @@
-from tkinter import filedialog, Label, ttk
-import tkinter.font as font
 from PIL import Image, ImageSequence
-import customtkinter # type: ignore
-from customtkinter import CTkScrollableFrame
+import customtkinter  # type: ignore
 from itertools import cycle
-import tkinter as tk
 
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 800
@@ -84,7 +80,6 @@ class HomePage(customtkinter.CTkFrame):
         self.centered_frame = customtkinter.CTkFrame(self, bg_color="#2b2b2b")
         self.centered_frame.grid(row=0, column=0, sticky="nsew")
         self.centered_frame.configure(width=400, height=400)
-
 
         self.centered_frame.columnconfigure(0, weight=1)
         self.centered_frame.rowconfigure(0, weight=1)
@@ -166,19 +161,25 @@ class ResultsPage(customtkinter.CTkFrame):
         self.controller = controller
         self.displayed_results = []
         self.results_count_label = None
+        self.ranked_var = customtkinter.BooleanVar(value=False)
+        self.okapi_var = customtkinter.BooleanVar(value=False)
 
         self.top_frame = customtkinter.CTkFrame(self)
-        self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=2)
+        self.top_frame.grid(row=0, column=0, sticky="nsew", columnspan=3)
 
         # Configure the row and column weights
         self.rowconfigure(0, weight=0)
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
+        self.columnconfigure(2, weight=0)
+        self.columnconfigure(3, weight=0)
 
         # Configure the row and column weights for top frame
         self.top_frame.columnconfigure(0, weight=0)
         self.top_frame.columnconfigure(1, weight=1)
+        self.top_frame.columnconfigure(2, weight=1)
+        self.top_frame.columnconfigure(3, weight=1)
         self.top_frame.rowconfigure(0, weight=1)
 
         self.results_search_entry = None
@@ -186,7 +187,7 @@ class ResultsPage(customtkinter.CTkFrame):
         # Add result frame to canvas
         self.results_frame = LazyLoading(self, [])
         self.results_frame.grid(
-            row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
+            row=1, column=0, sticky="nsew", columnspan=3, pady=(5, 0)
         )
 
         # Label for displaying the number of results
@@ -203,10 +204,15 @@ class ResultsPage(customtkinter.CTkFrame):
             pady=10,
             text_color="white",
         )
+        logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
 
         if not self.results_search_entry:
             self.results_search_entry = customtkinter.CTkEntry(
-                self.top_frame, width=600, height=40, corner_radius=25, fg_color="#2b2b2b"
+                self.top_frame,
+                width=600,
+                height=40,
+                corner_radius=25,
+                fg_color="#2b2b2b",
             )
             self.results_search_entry.grid(row=0, column=1, sticky="w")
 
@@ -215,15 +221,58 @@ class ResultsPage(customtkinter.CTkFrame):
                 lambda event=None: self.controller.ui_manager.perform_search_ui(),
             )
         else:
-            self.results_search_entry.delete(0, 'end') 
+            self.results_search_entry.delete(0, "end")
+        
+        # Initialize the ranked checkbox
+        self.ranked = customtkinter.CTkCheckBox(
+            self.top_frame,
+            text="Ranked",
+            checkbox_width=20,
+            checkbox_height=20,
+            corner_radius=1,
+            border_width=1,
+            variable=self.ranked_var, 
+            command=self._ranked_checkbox_callback
+        )
+        self.ranked.grid(row=0, column=2, sticky="w", padx=(35, 15), pady=25)
+
+        # Initialize the Okapi checkbox, initially disabled
+        self.okmapi = customtkinter.CTkCheckBox(
+            self.top_frame,
+            text="Okapi",
+            checkbox_width=20,
+            checkbox_height=20,
+            corner_radius=1,
+            border_width=1,
+            variable=self.okapi_var,
+            command=self._okapi_checkbox_callback,
+        )
+        self.okmapi.grid(row=0, column=3, sticky="w", padx=(5, 5), pady=25)
 
         self.results_search_entry.insert(0, query)
-        logo_label.grid(row=0, column=0, sticky="w", padx=(50, 45), pady=25)
+    
+    def _ranked_checkbox_callback(self):
+        ranked_checked = self.ranked_var.get()
+        if ranked_checked:
+            self.okmapi.configure(state="disabled")
+        else:
+            self.okmapi.configure(state="normal")
+            self.okapi_var.set(False)
+
+    def _okapi_checkbox_callback(self):
+        okapi_checked = self.okapi_var.get()
+        if okapi_checked:
+            self.ranked.configure(state="disabled")
+        else:
+            self.ranked.configure(state="normal")
+            self.ranked_var.set(False)
 
     def display_no_results_warning(self, query, error_message=None):
         """Display the no results message inside the results frame."""
         result_frame = customtkinter.CTkFrame(self.results_frame)
-        animated_gif = AnimatedGIF(result_frame, path="./img/marvel.gif", size=(150, 150))
+        animated_gif = AnimatedGIF(
+            result_frame, path="./img/marvel.gif", size=(150, 150)
+        )
         message = f"Your search - {query} - did not match any Documents \n\nSuggestions: \n\n\u2022 Make sure all keywords are spelled correctly.\n\u2022 Try different keywords\n\u2022 Try more general keywords."
         if error_message:
             message += f"\n\nError: {error_message}"
@@ -235,12 +284,9 @@ class ResultsPage(customtkinter.CTkFrame):
         )
 
         message_label = customtkinter.CTkLabel(
-            result_frame,
-            text=message,
-            font=("Helvetica", 14),
-            justify="left"
+            result_frame, text=message, font=("Helvetica", 14), justify="left"
         )
-        
+
         self.update_idletasks()
 
         result_frame.grid(row=1, column=0, columnspan=2)
@@ -258,21 +304,22 @@ class ResultsPage(customtkinter.CTkFrame):
             row=1, column=0, sticky="nsew", columnspan=2, pady=(5, 0)
         )
 
+
 class LazyLoading(customtkinter.CTkScrollableFrame):
     def __init__(self, master, data_items, chunk_size=15, *args, **kwargs):
         """Initializes the LazyLoading frame with data items and settings."""
         super().__init__(master, *args, **kwargs)
-        
+
         self.data_items = data_items
         self.chunk_size = chunk_size
-        self.last_loaded_index = -1  
+        self.last_loaded_index = -1
 
         self.load_initial_widgets()
         self.periodic_check_scroll()
 
     def update_results_count(self, count):
         """Updates the results count label with the given count."""
-        if hasattr(self, 'results_count_label') and self.results_count_label:
+        if hasattr(self, "results_count_label") and self.results_count_label:
             self.results_count_label.destroy()
 
         message = f"About {count} results"
@@ -281,8 +328,10 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
             text=message,
             font=("Helvetica", 11),
         )
-        
-        self.results_count_label.grid(row=0, column=0, sticky="w", padx=150, pady=(5, 0))
+
+        self.results_count_label.grid(
+            row=0, column=0, sticky="w", padx=150, pady=(5, 0)
+        )
 
     def load_initial_widgets(self):
         """Loads the initial set of widgets based on the chunk size."""
@@ -292,7 +341,7 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
     def periodic_check_scroll(self):
         """Periodically checks the scroll position to load more items if needed."""
         yview = self._parent_canvas.yview()
-        if yview[1] >= 0.95:  
+        if yview[1] >= 0.95:
             self.load_next_chunk()
 
         self.after(100, self.periodic_check_scroll)
@@ -308,8 +357,8 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
         for i in range(start, end):
             if i < len(self.data_items):
                 widget = self.create_widget_from_data(self.data_items[i])
-                widget.grid(row=i+1, column=0, sticky="nsew")  
-        
+                widget.grid(row=i + 1, column=0, sticky="nsew")
+
         self.last_loaded_index = end - 1
 
     def create_widget_from_data(self, data):
@@ -317,9 +366,10 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
         parts = data.split(" - ")
         doc_id_str = parts[0].replace("Document ID# ", "")
         doc_title = parts[1]
+        score_str = parts[2] if len(parts) > 2 else None  
 
-        doc_id = int(doc_id_str) 
-        
+        doc_id = int(doc_id_str)
+
         result_frame = customtkinter.CTkFrame(self)
         result_frame.grid(sticky="ew", padx=150)
 
@@ -329,23 +379,41 @@ class LazyLoading(customtkinter.CTkScrollableFrame):
             font=("Helvetica", 11),
         ).grid(row=0, column=0, sticky="w")
 
-        customtkinter.CTkLabel(
-            result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
-        ).grid(row=1, column=0, sticky="w", pady=(0, 25))
+        if score_str:
+            customtkinter.CTkLabel(
+                result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
+            ).grid(row=1, column=0, sticky="w")
+            
+            customtkinter.CTkLabel(
+                result_frame, text=f"Score: {score_str}", font=("Helvetica", 11)
+            ).grid(row=2, column=0, sticky="w", pady=(0, 25))
+        else:
+            customtkinter.CTkLabel(
+                result_frame, text=doc_title, font=("Helvetica", 20), text_color="#5291f7"
+            ).grid(row=1, column=0, sticky="w", pady=(0, 25))
 
         return result_frame
 
+
 class AnimatedGIF:
     def __init__(self, master, path, size):
-        self.frames = [frame.copy() for frame in ImageSequence.Iterator(Image.open(path))]
+        self.frames = [
+            frame.copy() for frame in ImageSequence.Iterator(Image.open(path))
+        ]
         self.frames_cycle = cycle(self.frames)
-        self.current_image = customtkinter.CTkImage(light_image=next(self.frames_cycle), size=size)
-        self.image_label = customtkinter.CTkLabel(master, image=self.current_image, text="")
-        self.image_label.grid(row=2, column=0, sticky="w", padx=150, pady=(25,0))
+        self.current_image = customtkinter.CTkImage(
+            light_image=next(self.frames_cycle), size=size
+        )
+        self.image_label = customtkinter.CTkLabel(
+            master, image=self.current_image, text=""
+        )
+        self.image_label.grid(row=2, column=0, sticky="w", padx=150, pady=(25, 0))
         self._animate()
 
     def _animate(self):
-        next_image = customtkinter.CTkImage(light_image=next(self.frames_cycle), size=(175, 175))
+        next_image = customtkinter.CTkImage(
+            light_image=next(self.frames_cycle), size=(175, 175)
+        )
         self.image_label.configure(image=next_image)
-        self.image_label.image = next_image  
+        self.image_label.image = next_image
         self.image_label.after(15, self._animate)

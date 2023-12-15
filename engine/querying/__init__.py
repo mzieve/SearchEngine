@@ -5,3 +5,4 @@ from .andquery import AndQuery
 from .phraseliteral import PhraseLiteral
 from .notquery import NotQuery
 from .booleanqueryparser import BooleanQueryParser
+from .rankedquery import RankedQuery

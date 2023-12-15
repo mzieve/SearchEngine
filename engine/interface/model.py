@@ -1,30 +1,24 @@
-from engine.indexing import Index, PositionalInvertedIndex, DiskIndexWriter, DiskPositionalIndex
-from config import DB_PATH, POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, DATA_DIR
-from engine.querying import BooleanQueryParser, PhraseLiteral
-from tkinter import filedialog, Label, ttk
-import customtkinter # type: ignore
-from pathlib import Path
-from io import StringIO, TextIOWrapper
-from .decorators import threaded, threaded_value
-import time
-import re
+from engine.indexing import (
+    PositionalInvertedIndex,
+    DiskPositionalIndex,
+    SPIMI
+)
+from config import (
+    DB_PATH,
+    POSTINGS_FILE_PATH,
+    DATA_DIR,
+    BUCKET_DIR,
+)
+from engine.querying import BooleanQueryParser, PhraseLiteral, RankedQuery
+from tkinter import filedialog
+import customtkinter  # type: ignore
+from .decorators import threaded
 import traceback
-import queue
-import io
-import builtins
 import config
 import os
 import json
-import sqlite3
-from engine.text import (
-    BasicTokenProcessor,
-    SpanishTokenProcessor,
-    EnglishTokenStream,
-    SpanishTokenStream,
-    Preprocessing,
-)
+from engine.text import Preprocessing, SpellingCorrection
 from engine.documents import (
-    DocumentCorpus,
     DirectoryCorpus,
     TextFileDocument,
     JsonDocument,
@@ -34,8 +28,10 @@ from engine.documents import (
 
 class CorpusManager:
     def __init__(self, search_manager):
+        """Initialize the CorpusManager."""
         self.corpus = None
         self.preprocess = Preprocessing()
+        self.p_i_index = PositionalInvertedIndex()
         self.search_manager = search_manager
 
     def load_corpus(self, folder_selected):
@@ -44,45 +40,39 @@ class CorpusManager:
             ".json": JsonDocument.load_from,
             ".xml": XMLDocument.load_from,
         }
-        self.corpus = DirectoryCorpus.load_directory(
-            folder_selected, extension_factories
-        )
-        return self.corpus
+        self.corpus = DirectoryCorpus(folder_selected, factories=extension_factories)
 
     def index_corpus(self, progress_callback=None):
-        # Detect the language using the first document in the corpus
-        first_doc_content = self.corpus[0].get_content()
-        if isinstance(first_doc_content, io.TextIOWrapper):
-            lang_content = first_doc_content.read()
-        else:
-            lang_content = " ".join(first_doc_content)
+        """Index the corpus using SPIMI."""
+        # Initialize SPIMI with the DirectoryCorpus instance
+        spimi = SPIMI(self.corpus)
+        spimi.spimi_index(progress_callback=progress_callback)
 
-        language = self.preprocess.detect_language(lang_content)
-        config.LANGUAGE = language
-
-        language_file_path = os.path.join(DATA_DIR, 'language.json')
-        with open(language_file_path, 'w') as language_file:
-            json.dump({'language': language}, language_file)
-
-        in_memory_index = self.preprocess.dic_process_position(self.corpus, progress_callback)
-
-        index_writer = DiskIndexWriter(DB_PATH, in_memory_index)
-        index_writer.write_index(POSTINGS_FILE_PATH, DOC_WEIGHTS_FILE_PATH, self.corpus)
-        index_writer.close()
-
-        # After indexing, initialize the disk index
+        # Initialize the disk index
         if self.search_manager:
             self.search_manager.initialize_disk_index()
 
     def load_language_setting(self):
-        language_file_path = os.path.join(DATA_DIR, 'language.json')
+        language_file_path = os.path.join(DATA_DIR, "language.json")
         if os.path.exists(language_file_path):
-            with open(language_file_path, 'r') as language_file:
+            with open(language_file_path, "r") as language_file:
                 language_data = json.load(language_file)
-                config.LANGUAGE = language_data.get('language')
+                config.LANGUAGE = language_data.get("language")
+
 
 class SearchManager:
-    def __init__(self, corpus_manager, preprocess, view, search_entry, results_search_entry, home_warning_label, canvas):
+    """Handles the search operation."""
+    def __init__(
+        self,
+        corpus_manager,
+        preprocess,
+        view,
+        search_entry,
+        results_search_entry,
+        home_warning_label,
+        canvas,
+    ):
+        """Initialize the SearchManager."""
         self.corpus_manager = corpus_manager
         self.view = view
         self.search_entry = search_entry
@@ -93,8 +83,11 @@ class SearchManager:
         self.disk_index = None
 
     def initialize_disk_index(self):
+        """Initialize the disk index."""
         if self.is_indexed():
             self.disk_index = self.load_disk_index()
+            self.spelling_correction = SpellingCorrection(self.disk_index)
+            self.ranked_query_processor = RankedQuery(self.disk_index)
 
     def is_indexed(self):
         """Check if the index files exist."""
@@ -114,6 +107,7 @@ class SearchManager:
             return None
 
     def perform_search(self):
+        """Perform the search operation."""
         self.corpus_manager.load_language_setting()
 
         if not self._corpus_ready():
@@ -124,6 +118,13 @@ class SearchManager:
         if not raw_query:
             self.home_warning_label.configure(text="Please enter a search query.")
             return
+        
+        """
+        if not self.disk_index.getPostings(raw_query):
+            corrected_query = self.spelling_correction.suggest_corrections(raw_query)
+            if corrected_query:
+                print(f"Did you mean: {corrected_query}?")
+        """
 
         self.view.pages["ResultsPage"].show_results_page(raw_query)
         self._prepare_results_page()
@@ -131,13 +132,21 @@ class SearchManager:
         try:
             query = BooleanQueryParser.parse_query(raw_query, self.preprocess)
 
-            postings = self._get_postings(query)
+            if self.view.pages["ResultsPage"].ranked_var.get() or self.view.pages["ResultsPage"].okapi_var.get():
+                use_okapi = self.view.pages["ResultsPage"].okapi_var.get()
+                results = self.ranked_query_processor.rank_documents(raw_query, use_okapi)
+            else:
+                postings = self._get_postings(query)
+                results = [(posting.doc_id, 0) for posting in postings] 
 
-            if not postings:
+            if not results:
                 self.view.pages["ResultsPage"].display_no_results_warning(raw_query)
                 return
 
-            self._display_search_results(postings)
+            self._display_search_results(results)
+
+            self.view.pages["ResultsPage"].ranked_var.set(False)
+            self.view.pages["ResultsPage"].okapi_var.set(False)
 
         except Exception as e:
             self._handle_search_error(e)
@@ -164,8 +173,10 @@ class SearchManager:
         """
         if isinstance(query_component, PhraseLiteral):
             return True
-        elif hasattr(query_component, 'components'):
-            return any(self._is_phrase_query(comp) for comp in query_component.components)
+        elif hasattr(query_component, "components"):
+            return any(
+                self._is_phrase_query(comp) for comp in query_component.components
+            )
         return False
 
     def _get_postings(self, query):
@@ -186,22 +197,37 @@ class SearchManager:
 
         return postings
 
-    def _display_search_results(self, postings):
-        results = len(postings)
-        self.view.pages["ResultsPage"].results_frame.update_results_count(results)
+    def _display_search_results(self, results):
+        """Display the search results on the ResultsPage."""
+        results_count = len(results)
+        self.view.pages["ResultsPage"].results_frame.update_results_count(results_count)
 
-        data_items = [f"Document ID# {posting.doc_id} - {self.get_document_title(posting.doc_id)}" for posting in postings]
+        data_items = []
+        for result in results:
+            doc_id, score = result
+            doc_title = self.get_document_title(doc_id)
+            if score > 0:
+                # Handle ranked postings (doc_id, score)
+                data_item = f"Document ID# {doc_id} - {doc_title} - Score: {score:.3f}"
+            else:
+                # Handle regular postings (just Posting objects)
+                data_item = f"Document ID# {doc_id} - {doc_title}"
+            data_items.append(data_item)
+
         self.view.pages["ResultsPage"].results_frame.data_items = data_items
         self.view.pages["ResultsPage"].results_frame.load_initial_widgets()
+
 
     def get_document_title(self, doc_id):
         """Retrieve the title of a document based on its document ID."""
         if self.disk_index:
             try:
-                self.disk_index.db_cursor.execute('SELECT title FROM document_metadata WHERE doc_id = ?', (doc_id,))
+                self.disk_index.db_cursor.execute(
+                    "SELECT title FROM document_metadata WHERE doc_id = ?", (doc_id,)
+                )
                 result = self.disk_index.db_cursor.fetchone()
                 if result:
-                    return result[0]  # Returns the title
+                    return result[0]  
                 else:
                     return "Title not found"
             except Exception as e:
@@ -233,7 +259,9 @@ class UIManager:
             return
 
         # Create the progress frame
-        self.progress_frame = customtkinter.CTkFrame(self.view.pages["HomePage"].centered_frame, fg_color="#2b2b2b")
+        self.progress_frame = customtkinter.CTkFrame(
+            self.view.pages["HomePage"].centered_frame, fg_color="#2b2b2b"
+        )
         self.progress_frame.grid(row=4, column=0, pady=0)
 
         self.progress_frame.rowconfigure(0, weight=0, minsize=30)
@@ -244,10 +272,10 @@ class UIManager:
             mode="determinate",
             width=500,
             height=10,
-            progress_color="#7236bf"
+            progress_color="#7236bf",
         )
         self.progress.set(0)
-        self.progress.grid(row=0, column=0, pady=(0,15))
+        self.progress.grid(row=0, column=0, pady=(0, 15))
 
         self.progress_info_label = customtkinter.CTkLabel(
             self.progress_frame,
@@ -262,27 +290,30 @@ class UIManager:
         self.total_documents = sum(1 for _ in self.corpus_manager.corpus)
 
         # Start the indexing
-        self.corpus_manager.index_corpus(self.update_progress_ui)
+        self.corpus_manager.index_corpus(progress_callback=self.update_progress_ui)
 
         # After indexing
         self.progress.grid_forget()
         self.progress_info_label.grid_forget()
         self.progress_frame.grid_forget()
 
-    def update_progress_ui(self, current_document_index):
-       """Schedule the progress UI update."""
-       self.master.after(0, self._update_progress_ui_on_main_thread, current_document_index)
-
-    def _update_progress_ui_on_main_thread(self, current_document_index):
+    def update_progress_ui(self, progress_fraction):
         """Update the progress UI based on the indexed documents."""
-        progress_fraction = current_document_index / self.total_documents
-        percentage_complete = progress_fraction * 100
+        # Ensure progress_fraction does not exceed 1.0
+        progress_fraction = min(progress_fraction, 1.0)
 
+        # Update the progress bar with this fraction
+        self.master.after(0, self._update_progress_ui_on_main_thread, progress_fraction)
+
+
+    def _update_progress_ui_on_main_thread(self, progress_fraction):
+        """Update the progress UI on the main thread."""
+        percentage_complete = progress_fraction * 100
         self.progress.set(progress_fraction)
         self.progress_info_label.configure(text=f"Progress: {percentage_complete:.1f}%")
 
     def perform_search_ui(self):
-        # UI interactions for the search operation run in a new thread
+        # Pass the ranked_search_enabled parameter to perform_search
         self.search_manager.perform_search()
 
     def show_warning(self, message):
